@@ -1,6 +1,7 @@
 package cz.kspol.stableapp.resetv8;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -15,12 +16,16 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * STABLE RESET v8 / krok 2.
- * Vše je lokální a deterministické: žádná síť, WebView, databáze ani soubory při startu.
+ * STABLE RESET v8 / krok 3.
+ * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
+ * načtou až po otevření obrazovky MOJE DOTAZY.
  */
 public final class MainActivity extends Activity {
     private static final int GREEN = Color.rgb(18, 61, 47);
@@ -28,9 +33,10 @@ public final class MainActivity extends Activity {
     private static final int PAPER = Color.rgb(243, 245, 244);
     private static final int BORDER = Color.rgb(220, 225, 222);
     private static final int RED = Color.rgb(155, 45, 45);
+    private static final String PREFS = "kspol_step3_local_inquiries";
+    private static final String INQUIRY_COUNT = "inquiry_count";
 
     private final List<Product> selectedProducts = new ArrayList<>();
-    private LinearLayout screenHost;
 
     private final Product[] products = new Product[]{
             new Product("Glock 17 Gen5", "9 mm Luger", "KRÁTKÉ ZBRANĚ", R.drawable.product_pistol),
@@ -48,13 +54,16 @@ public final class MainActivity extends Activity {
     }
 
     private void showHomeScreen() {
-        screenHost = createRoot();
-        screenHost.addView(createHeader("+K SPOL. S R.O."));
-
+        LinearLayout root = createRoot();
+        root.addView(createHeader("+K SPOL. S R.O."));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.addView(label("Katalog", 28, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 2", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 3", 14, Color.DKGRAY, false));
+
+        Button myQuestions = actionButton("MOJE DOTAZY", GREEN);
+        myQuestions.setOnClickListener(v -> showMyQuestions());
+        addTopMargin(content, myQuestions, 12);
 
         String[] categories = {
                 "KRÁTKÉ ZBRANĚ", "DLOUHÉ ZBRANĚ", "STŘELIVO",
@@ -74,42 +83,35 @@ public final class MainActivity extends Activity {
             inquiry.setOnClickListener(v -> showInquiry());
             addTopMargin(content, inquiry, 16);
         }
-
         TextView note = label(
-                "Krok 2 přidává produktové obrázky a vícepoložkovou poptávku. " +
-                        "Výběr je pouze v paměti telefonu a po zavření aplikace se neukládá.",
+                "Krok 3 ukládá vytvořené dotazy a rezervační čísla pouze lokálně v telefonu. "
+                        + "Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
         addTopMargin(content, note, 16);
-
         scroll.addView(content);
-        screenHost.addView(scroll, matchRemaining());
-        setContentView(screenHost);
-        screenHost.requestApplyInsets();
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
     }
 
     private void showProducts(String category) {
         LinearLayout root = createRoot();
         root.addView(createHeader(category == null ? "VŠECHNY PRODUKTY" : category));
-
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-
         Button back = secondaryButton("← ZPĚT NA KATALOG");
         back.setOnClickListener(v -> showHomeScreen());
         content.addView(back);
-
         if (!selectedProducts.isEmpty()) {
             Button inquiry = actionButton("MOJE POPTÁVKA (" + selectedProducts.size() + ")", GREEN);
             inquiry.setOnClickListener(v -> showInquiry());
             addTopMargin(content, inquiry, 10);
         }
-
         for (Product product : products) {
             if (category == null || category.equals(product.category)) {
                 content.addView(productCard(product));
             }
         }
-
         scroll.addView(content);
         root.addView(scroll, matchRemaining());
         setContentView(root);
@@ -119,16 +121,12 @@ public final class MainActivity extends Activity {
     private void showInquiry() {
         LinearLayout root = createRoot();
         root.addView(createHeader("MOJE POPTÁVKA"));
-
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-
         Button back = secondaryButton("← ZPĚT NA KATALOG");
         back.setOnClickListener(v -> showHomeScreen());
         content.addView(back);
-
         content.addView(label("Vybrané položky: " + selectedProducts.size(), 20, BLACK, true));
-
         if (selectedProducts.isEmpty()) {
             TextView empty = label("Poptávka je prázdná.", 15, Color.DKGRAY, false);
             addTopMargin(content, empty, 16);
@@ -137,19 +135,102 @@ public final class MainActivity extends Activity {
             for (Product product : snapshot) {
                 content.addView(inquiryRow(product));
             }
-
-            Button send = actionButton("POPTAT VYBRANÉ POLOŽKY", GREEN);
-            send.setOnClickListener(v -> Toast.makeText(
-                    this,
-                    "Krok 2: výběr funguje. Odeslání bude přidáno v dalším stabilním kroku.",
-                    Toast.LENGTH_LONG).show());
-            addTopMargin(content, send, 18);
+            Button save = actionButton("VYTVOŘIT DOTAZ", GREEN);
+            save.setOnClickListener(v -> {
+                String reservationNumber = saveLocalInquiry();
+                selectedProducts.clear();
+                Toast.makeText(this, "Dotaz uložen. Rezervační číslo: " + reservationNumber,
+                        Toast.LENGTH_LONG).show();
+                showMyQuestions();
+            });
+            addTopMargin(content, save, 18);
         }
-
         scroll.addView(content);
         root.addView(scroll, matchRemaining());
         setContentView(root);
         root.requestApplyInsets();
+    }
+
+    private void showMyQuestions() {
+        LinearLayout root = createRoot();
+        root.addView(createHeader("MOJE DOTAZY"));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        Button back = secondaryButton("← ZPĚT NA KATALOG");
+        back.setOnClickListener(v -> showHomeScreen());
+        content.addView(back);
+        List<Inquiry> inquiries = loadLocalInquiries();
+        content.addView(label("Uložené dotazy: " + inquiries.size(), 20, BLACK, true));
+        if (inquiries.isEmpty()) {
+            TextView empty = label("Zatím nemáte žádný uložený dotaz.", 15, Color.DKGRAY, false);
+            addTopMargin(content, empty, 16);
+        } else {
+            for (int i = inquiries.size() - 1; i >= 0; i--) {
+                content.addView(inquiryHistoryCard(inquiries.get(i)));
+            }
+        }
+        scroll.addView(content);
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private String saveLocalInquiry() {
+        SharedPreferences preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        Date now = new Date();
+        String dayKey = new SimpleDateFormat("yyyyMMdd", Locale.ROOT).format(now);
+        String counterKey = "reservation_counter_" + dayKey;
+        int sequence = preferences.getInt(counterKey, 0) + 1;
+        String datePrefix = new SimpleDateFormat("dd.MM.", Locale.ROOT).format(now);
+        String reservationNumber = datePrefix + "-" + String.format(Locale.ROOT, "%03d", sequence);
+        String createdAt = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(now);
+        StringBuilder productNames = new StringBuilder();
+        for (Product product : selectedProducts) {
+            if (productNames.length() > 0) {
+                productNames.append("\n");
+            }
+            productNames.append(product.name).append(" — ").append(product.subtitle);
+        }
+        int index = preferences.getInt(INQUIRY_COUNT, 0);
+        preferences.edit()
+                .putInt(counterKey, sequence)
+                .putString("inquiry_" + index + "_number", reservationNumber)
+                .putString("inquiry_" + index + "_created", createdAt)
+                .putString("inquiry_" + index + "_products", productNames.toString())
+                .putInt(INQUIRY_COUNT, index + 1)
+                .commit();
+        return reservationNumber;
+    }
+
+    private List<Inquiry> loadLocalInquiries() {
+        SharedPreferences preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+        int count = preferences.getInt(INQUIRY_COUNT, 0);
+        List<Inquiry> inquiries = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            String number = preferences.getString("inquiry_" + i + "_number", "");
+            String created = preferences.getString("inquiry_" + i + "_created", "");
+            String productNames = preferences.getString("inquiry_" + i + "_products", "");
+            if (!number.isEmpty()) {
+                inquiries.add(new Inquiry(number, created, productNames));
+            }
+        }
+        return inquiries;
+    }
+
+    private LinearLayout inquiryHistoryCard(Inquiry inquiry) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setBackground(rounded(Color.WHITE, BORDER, 16));
+        card.addView(label("Rezervační číslo " + inquiry.number, 18, GREEN, true));
+        card.addView(label(inquiry.createdAt, 13, Color.DKGRAY, false));
+        card.addView(label(inquiry.productNames, 15, BLACK, false));
+        card.addView(label("ČEKÁ NA VYŘÍZENÍ", 12, GREEN, true));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(8), 0, dp(8));
+        card.setLayoutParams(params);
+        return card;
     }
 
     private LinearLayout productCard(Product product) {
@@ -158,22 +239,20 @@ public final class MainActivity extends Activity {
         card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(12), dp(12), dp(12), dp(12));
         card.setBackground(rounded(Color.WHITE, BORDER, 16));
-
         ImageView image = new ImageView(this);
         image.setImageResource(product.imageRes);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setBackgroundColor(Color.rgb(235, 238, 236));
         card.addView(image, new LinearLayout.LayoutParams(dp(96), dp(96)));
-
         LinearLayout text = new LinearLayout(this);
         text.setOrientation(LinearLayout.VERTICAL);
         text.setPadding(dp(14), 0, 0, 0);
         text.addView(label(product.name, 17, BLACK, true));
         text.addView(label(product.subtitle, 14, Color.DKGRAY, false));
         text.addView(label(product.category, 11, GREEN, true));
-
         boolean selected = selectedProducts.contains(product);
-        Button add = actionButton(selected ? "V POPTÁVCE" : "PŘIDAT DO POPTÁVKY", selected ? Color.GRAY : GREEN);
+        Button add = actionButton(selected ? "V POPTÁVCE" : "PŘIDAT DO POPTÁVKY",
+                selected ? Color.GRAY : GREEN);
         add.setEnabled(!selected);
         add.setOnClickListener(v -> {
             if (!selectedProducts.contains(product)) {
@@ -182,7 +261,6 @@ public final class MainActivity extends Activity {
             }
         });
         addTopMargin(text, add, 8);
-
         card.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -197,27 +275,23 @@ public final class MainActivity extends Activity {
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(10), dp(10), dp(10), dp(10));
         row.setBackground(rounded(Color.WHITE, BORDER, 14));
-
         ImageView image = new ImageView(this);
         image.setImageResource(product.imageRes);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         image.setBackgroundColor(Color.rgb(235, 238, 236));
         row.addView(image, new LinearLayout.LayoutParams(dp(72), dp(72)));
-
         LinearLayout text = new LinearLayout(this);
         text.setOrientation(LinearLayout.VERTICAL);
         text.setPadding(dp(12), 0, dp(8), 0);
         text.addView(label(product.name, 16, BLACK, true));
         text.addView(label(product.subtitle, 13, Color.DKGRAY, false));
         row.addView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
         Button remove = actionButton("ODEBRAT", RED);
         remove.setOnClickListener(v -> {
             selectedProducts.remove(product);
             showInquiry();
         });
         row.addView(remove, new LinearLayout.LayoutParams(dp(104), ViewGroup.LayoutParams.WRAP_CONTENT));
-
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, dp(8), 0, dp(8));
@@ -242,12 +316,10 @@ public final class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(18), dp(10), dp(18), dp(10));
         header.setBackgroundColor(GREEN);
-
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.kspol_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
         header.addView(logo, new LinearLayout.LayoutParams(dp(64), dp(64)));
-
         TextView brand = label(title, 20, Color.WHITE, true);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -322,10 +394,10 @@ public final class MainActivity extends Activity {
         return view;
     }
 
-    private void addTopMargin(LinearLayout parent, View child, int topDp) {
+    private void addTopMargin(LinearLayout parent, View child, int dpValue) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMargins(0, dp(topDp), 0, 0);
+        params.setMargins(0, dp(dpValue), 0, 0);
         parent.addView(child, params);
     }
 
@@ -348,6 +420,18 @@ public final class MainActivity extends Activity {
             this.subtitle = subtitle;
             this.category = category;
             this.imageRes = imageRes;
+        }
+    }
+
+    private static final class Inquiry {
+        final String number;
+        final String createdAt;
+        final String productNames;
+
+        Inquiry(String number, String createdAt, String productNames) {
+            this.number = number;
+            this.createdAt = createdAt;
+            this.productNames = productNames;
         }
     }
 }
