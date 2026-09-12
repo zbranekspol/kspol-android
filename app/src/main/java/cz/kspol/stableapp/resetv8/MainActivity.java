@@ -535,9 +535,11 @@ public final class MainActivity extends Activity {
         String cleanPrice = cleanHtml(price);
         String stock;
         String normalized = availability == null ? "" : availability.toLowerCase(Locale.ROOT);
-        if (normalized.contains("in_stock") || normalized.contains("instock")) stock = "Skladem";
+        if (normalized.contains("in_stock") || normalized.contains("instock")
+                || normalized.contains("in stock")) stock = "Skladem";
         else if (normalized.contains("preorder")) stock = "Na objednávku";
-        else if (normalized.contains("out_of_stock") || normalized.contains("outofstock")) {
+        else if (normalized.contains("out_of_stock") || normalized.contains("outofstock")
+                || normalized.contains("out of stock")) {
             stock = "Není skladem";
         } else stock = cleanHtml(availability);
         if (cleanPrice.isEmpty()) return stock;

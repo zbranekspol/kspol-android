@@ -28,9 +28,11 @@ assert "HttpURLConnection" in main
 assert "XmlPullParser" in main
 assert "isCatalogCacheCurrent" in main
 assert "Calendar.HOUR_OF_DAY, 6" in main
+assert 'TimeZone.getTimeZone("Europe/Prague")' in main
 assert "replaceCacheAtomically" in main
 assert "Používám poslední funkční kopii katalogu" in main
 assert "NAČÍST DALŠÍ" in main
+assert 'normalized.contains("in stock")' in main
 assert "product.description" in main
 assert "product.name" in main
 assert "product.category" not in re.search(
