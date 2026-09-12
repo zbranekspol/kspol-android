@@ -1,17 +1,18 @@
-# +K spol. — STABLE RESET v8 / krok 2
+# +K spol. — STABLE RESET v8 / krok 3
 
-Navazuje výhradně na potvrzený stabilní krok 1. Kód z nestabilní v7 nebyl použit.
+Navazuje výhradně na uživatelem potvrzený stabilní krok 2. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 2
+## Rozsah kroku 3
 
 - zachované logo +K spol.
 - zachovaných 6 kategorií + ZOBRAZIT VŠE
-- lokální produktové karty s obrázky
-- vícepoložkový výběr do „MOJE POPTÁVKA“
-- možnost ODEBRAT jednotlivou položku
-- bez WebView
-- bez oprávnění INTERNET
-- bez síťové, databázové nebo souborové operace při startu
-- výběr se v tomto kroku drží pouze v RAM a po ukončení aplikace se neukládá
+- produktové karty s obrázky
+- vícepoložková poptávka s možností ODEBRAT
+- obrazovka MOJE DOTAZY
+- lokální ukládání vytvořených dotazů v telefonu
+- lokální rezervační číslo ve formátu například `12.09.-001`
+- denní číselná řada začíná od 001
+- bez WebView a bez oprávnění INTERNET
+- při startu aplikace se nečtou uložené dotazy; načtou se až po otevření MOJE DOTAZY
 
-Po potvrzení stabilního startu následuje krok 3: Moje dotazy a lokální rezervační čísla.
+Po potvrzení stabilního startu následuje krok 4: zaměstnanecké přihlášení a změna hesla.
