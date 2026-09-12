@@ -48,10 +48,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 5.
+ * STABLE RESET v8 / krok 6.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
- * načtou až po otevření obrazovky MOJE DOTAZY. Shop5 katalog se načítá až po
- * kliknutí na ZOBRAZIT VŠE a používá denní cyklus cache od 06:00.
+ * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
+ * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
  */
 public final class MainActivity extends Activity {
     private static final int GREEN = Color.rgb(18, 61, 47);
@@ -80,6 +80,7 @@ public final class MainActivity extends Activity {
     private EditText searchInput;
     private TextView searchSummary;
     private LinearLayout searchResults;
+    private boolean catalogSearchLoading;
 
     private final String[] shopCategories = new String[]{
             "AKCE", "Bazar, komisní prodej", "Zbraně na ZO", "Zbraně bez ZO",
@@ -112,7 +113,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.addView(label("Katalog", 28, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 5", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 6", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -147,22 +148,20 @@ public final class MainActivity extends Activity {
             }
         });
 
+        content.addView(label("Všechny kategorie e-shopu", 22, BLACK, true));
+        for (String category : shopCategories) {
+            List<Product> matches = catalogProducts.isEmpty()
+                    ? new ArrayList<>()
+                    : productsForTopCategory(category);
+            String title = matches.isEmpty() ? category : category + " (" + matches.size() + ")";
+            TextView card = categoryCard(title, false);
+            card.setOnClickListener(v -> showShopCatalog(category));
+            content.addView(card);
+        }
+
         Button myQuestions = actionButton("MOJE DOTAZY", GREEN);
         myQuestions.setOnClickListener(v -> showMyQuestions());
         addTopMargin(content, myQuestions, 12);
-
-        String[] categories = {
-                "KRÁTKÉ ZBRANĚ", "DLOUHÉ ZBRANĚ", "STŘELIVO",
-                "OPTIKA", "PŘÍSLUŠENSTVÍ", "KOMISNÍ PRODEJ"
-        };
-        for (String category : categories) {
-            TextView card = categoryCard(category, false);
-            card.setOnClickListener(v -> showProducts(category));
-            content.addView(card);
-        }
-        TextView all = categoryCard("ZOBRAZIT VŠE", true);
-        all.setOnClickListener(v -> showShopCatalog());
-        content.addView(all);
 
         if (!selectedProducts.isEmpty()) {
             Button inquiry = actionButton("MOJE POPTÁVKA (" + selectedProducts.size() + ")", GREEN);
@@ -170,9 +169,9 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 5 přidává kompletní katalog Shop5. Aktualizuje se jednou denně "
-                        + "v cyklu od 6:00 a stará funkční kopie zůstane zachována při chybě. "
-                        + "Aplikace při startu nepoužívá internet.",
+                "Krok 6 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                        + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
+                        + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
         addTopMargin(content, note, 16);
         scroll.addView(content);
@@ -191,21 +190,49 @@ public final class MainActivity extends Activity {
             searchSummary.setVisibility(View.GONE);
             return;
         }
+        if (catalogProducts.isEmpty()) {
+            searchSummary.setText(catalogSearchLoading
+                    ? "Načítám katalog pro vyhledávání…"
+                    : "Připravuji katalog pro vyhledávání…");
+            searchSummary.setVisibility(View.VISIBLE);
+            if (!catalogSearchLoading) {
+                catalogSearchLoading = true;
+                new Thread(() -> {
+                    CatalogLoadResult result = loadCatalogData();
+                    runOnUiThread(() -> {
+                        catalogSearchLoading = false;
+                        if (result.products.isEmpty()) {
+                            searchSummary.setText("Katalog se nepodařilo načíst. Zkontrolujte připojení.");
+                            searchSummary.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        catalogProducts.clear();
+                        catalogProducts.addAll(result.products);
+                        if (searchInput != null) {
+                            renderSearchResults(searchInput.getText().toString());
+                        }
+                    });
+                }, "shop5-search-loader").start();
+            }
+            return;
+        }
         int matchCount = 0;
-        List<Product> searchableProducts = catalogProducts.isEmpty()
-                ? java.util.Arrays.asList(products)
-                : catalogProducts;
-        for (Product product : searchableProducts) {
+        int displayed = 0;
+        for (Product product : catalogProducts) {
             String searchable = (product.name + " " + product.description)
                     .toLowerCase(Locale.getDefault());
             if (searchable.contains(query)) {
-                searchResults.addView(productCard(product, true));
                 matchCount++;
+                if (displayed < 30) {
+                    searchResults.addView(productCard(product, true));
+                    displayed++;
+                }
             }
         }
         searchSummary.setText(matchCount == 0
                 ? "Žádný produkt nenalezen"
-                : "Nalezené produkty: " + matchCount);
+                : "Nalezené produkty: " + matchCount
+                        + (matchCount > displayed ? " • zobrazeno prvních " + displayed : ""));
         searchSummary.setVisibility(View.VISIBLE);
     }
 
@@ -234,6 +261,10 @@ public final class MainActivity extends Activity {
     }
 
     private void showShopCatalog() {
+        showShopCatalog(null);
+    }
+
+    private void showShopCatalog(String initialCategory) {
         LinearLayout root = createRoot();
         root.addView(createHeader("KATALOG E-SHOPU"));
         ScrollView scroll = new ScrollView(this);
@@ -252,8 +283,12 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
 
         if (!catalogProducts.isEmpty() && isCatalogCacheCurrent(catalogCacheFile())) {
-            status.setText("Katalog je aktuální pro dnešní cyklus od 6:00.");
-            renderShopCategories(categories);
+            if (initialCategory == null) {
+                status.setText("Katalog je aktuální pro dnešní cyklus od 6:00.");
+                renderShopCategories(categories);
+            } else {
+                showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1);
+            }
             return;
         }
 
@@ -263,17 +298,21 @@ public final class MainActivity extends Activity {
                 if (result.products.isEmpty()) {
                     status.setText("Katalog se nepodařilo načíst. Zkontrolujte připojení.");
                     Button retry = actionButton("ZKUSIT ZNOVU", GREEN);
-                    retry.setOnClickListener(v -> showShopCatalog());
+                    retry.setOnClickListener(v -> showShopCatalog(initialCategory));
                     addTopMargin(categories, retry, 12);
                     return;
                 }
                 catalogProducts.clear();
                 catalogProducts.addAll(result.products);
-                status.setText(result.usedOlderCache
-                        ? "Používám poslední funkční kopii katalogu."
-                        : "Aktualizováno pro denní cyklus od 6:00 • produktů: "
-                                + catalogProducts.size());
-                renderShopCategories(categories);
+                if (initialCategory == null) {
+                    status.setText(result.usedOlderCache
+                            ? "Používám poslední funkční kopii katalogu."
+                            : "Aktualizováno pro denní cyklus od 6:00 • produktů: "
+                                    + catalogProducts.size());
+                    renderShopCategories(categories);
+                } else {
+                    showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1);
+                }
             });
         }, "shop5-catalog-loader").start();
     }
@@ -314,7 +353,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← VŠECHNY KATEGORIE");
-        back.setOnClickListener(v -> showShopCatalog());
+        back.setOnClickListener(v -> showHomeScreen());
         content.addView(back);
 
         Set<String> subcategories = new LinkedHashSet<>();
@@ -597,9 +636,9 @@ public final class MainActivity extends Activity {
             }
             Button save = actionButton("VYTVOŘIT DOTAZ", GREEN);
             save.setOnClickListener(v -> {
-                String reservationNumber = saveLocalInquiry();
+                String questionNumber = saveLocalInquiry();
                 selectedProducts.clear();
-                Toast.makeText(this, "Dotaz uložen. Rezervační číslo: " + reservationNumber,
+                Toast.makeText(this, "Dotaz uložen. Číslo dotazu: " + questionNumber,
                         Toast.LENGTH_LONG).show();
                 showMyQuestions();
             });
@@ -642,7 +681,7 @@ public final class MainActivity extends Activity {
         String counterKey = "reservation_counter_" + dayKey;
         int sequence = preferences.getInt(counterKey, 0) + 1;
         String datePrefix = new SimpleDateFormat("dd.MM.", Locale.ROOT).format(now);
-        String reservationNumber = datePrefix + "-" + String.format(Locale.ROOT, "%03d", sequence);
+        String questionNumber = datePrefix + "-" + String.format(Locale.ROOT, "%03d", sequence);
         String createdAt = new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(now);
         StringBuilder productNames = new StringBuilder();
         for (Product product : selectedProducts) {
@@ -654,12 +693,12 @@ public final class MainActivity extends Activity {
         int index = preferences.getInt(INQUIRY_COUNT, 0);
         preferences.edit()
                 .putInt(counterKey, sequence)
-                .putString("inquiry_" + index + "_number", reservationNumber)
+                .putString("inquiry_" + index + "_number", questionNumber)
                 .putString("inquiry_" + index + "_created", createdAt)
                 .putString("inquiry_" + index + "_products", productNames.toString())
                 .putInt(INQUIRY_COUNT, index + 1)
                 .commit();
-        return reservationNumber;
+        return questionNumber;
     }
 
     private List<Inquiry> loadLocalInquiries() {
@@ -682,7 +721,7 @@ public final class MainActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
         card.setBackground(rounded(Color.WHITE, BORDER, 16));
-        card.addView(label("Rezervační číslo " + inquiry.number, 18, GREEN, true));
+        card.addView(label("Číslo dotazu " + inquiry.number, 18, GREEN, true));
         card.addView(label(inquiry.createdAt, 13, Color.DKGRAY, false));
         card.addView(label(inquiry.productNames, 15, BLACK, false));
         card.addView(label("ČEKÁ NA VYŘÍZENÍ", 12, GREEN, true));
