@@ -6,10 +6,14 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -23,7 +27,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * STABLE RESET v8 / krok 3.
+ * STABLE RESET v8 / krok 4.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY.
  */
@@ -37,6 +41,9 @@ public final class MainActivity extends Activity {
     private static final String INQUIRY_COUNT = "inquiry_count";
 
     private final List<Product> selectedProducts = new ArrayList<>();
+    private EditText searchInput;
+    private TextView searchSummary;
+    private LinearLayout searchResults;
 
     private final Product[] products = new Product[]{
             new Product("Glock 17 Gen5", "9 mm Luger", "KRÁTKÉ ZBRANĚ", R.drawable.product_pistol),
@@ -59,7 +66,40 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.addView(label("Katalog", 28, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 3", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 4", 14, Color.DKGRAY, false));
+
+        searchInput = new EditText(this);
+        searchInput.setHint("Hledat podle názvu nebo popisu…");
+        searchInput.setSingleLine(true);
+        searchInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        searchInput.setTextSize(16);
+        searchInput.setTextColor(BLACK);
+        searchInput.setHintTextColor(Color.GRAY);
+        searchInput.setPadding(dp(16), dp(12), dp(16), dp(12));
+        searchInput.setBackground(rounded(Color.WHITE, BORDER, 14));
+        addTopMargin(content, searchInput, 12);
+
+        searchSummary = label("", 14, Color.DKGRAY, true);
+        searchSummary.setVisibility(View.GONE);
+        addTopMargin(content, searchSummary, 8);
+
+        searchResults = new LinearLayout(this);
+        searchResults.setOrientation(LinearLayout.VERTICAL);
+        content.addView(searchResults);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                renderSearchResults(value.toString());
+            }
+        });
 
         Button myQuestions = actionButton("MOJE DOTAZY", GREEN);
         myQuestions.setOnClickListener(v -> showMyQuestions());
@@ -84,7 +124,8 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 3 ukládá vytvořené dotazy a rezervační čísla pouze lokálně v telefonu. "
+                "Krok 4 přidává okamžité lokální vyhledávání. Dotazy a rezervační čísla "
+                        + "zůstávají uložené pouze v telefonu. "
                         + "Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
         addTopMargin(content, note, 16);
@@ -92,6 +133,31 @@ public final class MainActivity extends Activity {
         root.addView(scroll, matchRemaining());
         setContentView(root);
         root.requestApplyInsets();
+    }
+
+    private void renderSearchResults(String rawQuery) {
+        if (searchResults == null || searchSummary == null) {
+            return;
+        }
+        searchResults.removeAllViews();
+        String query = rawQuery.trim().toLowerCase(Locale.getDefault());
+        if (query.isEmpty()) {
+            searchSummary.setVisibility(View.GONE);
+            return;
+        }
+        int matchCount = 0;
+        for (Product product : products) {
+            String searchable = (product.name + " " + product.subtitle)
+                    .toLowerCase(Locale.getDefault());
+            if (searchable.contains(query)) {
+                searchResults.addView(productCard(product, true));
+                matchCount++;
+            }
+        }
+        searchSummary.setText(matchCount == 0
+                ? "Žádný produkt nenalezen"
+                : "Nalezené produkty: " + matchCount);
+        searchSummary.setVisibility(View.VISIBLE);
     }
 
     private void showProducts(String category) {
@@ -109,7 +175,7 @@ public final class MainActivity extends Activity {
         }
         for (Product product : products) {
             if (category == null || category.equals(product.category)) {
-                content.addView(productCard(product));
+                content.addView(productCard(product, false));
             }
         }
         scroll.addView(content);
@@ -233,7 +299,7 @@ public final class MainActivity extends Activity {
         return card;
     }
 
-    private LinearLayout productCard(Product product) {
+    private LinearLayout productCard(Product product, boolean searchMode) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
@@ -257,7 +323,11 @@ public final class MainActivity extends Activity {
         add.setOnClickListener(v -> {
             if (!selectedProducts.contains(product)) {
                 selectedProducts.add(product);
-                showProducts(null);
+                if (searchMode && searchInput != null) {
+                    renderSearchResults(searchInput.getText().toString());
+                } else {
+                    showProducts(null);
+                }
             }
         });
         addTopMargin(text, add, 8);
