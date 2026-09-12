@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 8 branding and back navigation
+name: Build STABLE RESET v8 step 9 header title
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Verify stable step 8 branding and back navigation
-        run: python3 tests/verify_step8.py
+      - name: Verify stable step 9 header title
+        run: python3 tests/verify_step9.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,9 +29,9 @@ jobs:
       - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP8_BRANDING_BACK.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP9_HEADER_TITLE.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP8-BRANDING-BACK
-          path: Kspol_STABLE_RESET_v8_STEP8_BRANDING_BACK.apk
+          name: Kspol-STABLE-RESET-v8-STEP9-HEADER-TITLE
+          path: Kspol_STABLE_RESET_v8_STEP9_HEADER_TITLE.apk
           if-no-files-found: error

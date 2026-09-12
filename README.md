@@ -1,12 +1,13 @@
-# +K spol. — STABLE RESET v8 / krok 8
+# +K spol. — STABLE RESET v8 / krok 9
 
-Navazuje výhradně na uživatelem potvrzený stabilní krok 7. Kód z nestabilní v7 nebyl použit.
+Navazuje výhradně na uživatelem potvrzený stabilní krok 8. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 8
+## Rozsah kroku 9
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
-- titulní nadpis „Ověření dostupnosti na prodejně“
+- text „Ověření dostupnosti produktů na prodejně“ je přímo v hlavním záhlaví
+- duplicitní nadpis pod záhlavím byl odstraněn
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace
 - produktové karty s obrázky
 - vícepoložková poptávka s možností ODEBRAT

@@ -51,7 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 8.
+ * STABLE RESET v8 / krok 9.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -133,11 +133,10 @@ public final class MainActivity extends Activity {
     private void showHomeScreen() {
         backAction = null;
         LinearLayout root = createRoot();
-        root.addView(createHeader("+K SPOL. S R.O."));
+        root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("Ověření dostupnosti na prodejně", 26, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 8", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 9", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -197,7 +196,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 8 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                "Krok 9 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
