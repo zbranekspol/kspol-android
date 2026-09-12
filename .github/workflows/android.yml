@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 1
+name: Build STABLE RESET v8 step 2
 
 on:
   workflow_dispatch:
@@ -14,32 +14,24 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
-      - name: Verify offline stable start
-        run: python3 tests/verify_step1.py
-
+      - name: Verify offline stable step 2
+        run: python3 tests/verify_step2.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - uses: android-actions/setup-android@v3
-
       - name: Install Android 16 SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
-
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
-
-      - name: Build signed test APK
+      - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
-
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP1.apk
-
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP2.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP1
-          path: Kspol_STABLE_RESET_v8_STEP1.apk
+          name: Kspol-STABLE-RESET-v8-STEP2
+          path: Kspol_STABLE_RESET_v8_STEP2.apk
           if-no-files-found: error

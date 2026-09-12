@@ -1,16 +1,17 @@
-# +K spol. — STABLE RESET v8 / krok 1
+# +K spol. — STABLE RESET v8 / krok 2
 
-Standardní nativní Android projekt vytvořený pouze podle potvrzeného stabilního
-základu `Kspol_STABLE_RESET_v8_BASELINE.apk`. Kód z v7 nebyl použit.
+Navazuje výhradně na potvrzený stabilní krok 1. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 1
+## Rozsah kroku 2
 
-- logo +K spol.
-- šest hlavních kategorií
-- tlačítko ZOBRAZIT VŠE
-- žádný WebView
-- žádné oprávnění INTERNET
-- žádná síťová, databázová ani souborová operace při startu
+- zachované logo +K spol.
+- zachovaných 6 kategorií + ZOBRAZIT VŠE
+- lokální produktové karty s obrázky
+- vícepoložkový výběr do „MOJE POPTÁVKA“
+- možnost ODEBRAT jednotlivou položku
+- bez WebView
+- bez oprávnění INTERNET
+- bez síťové, databázové nebo souborové operace při startu
+- výběr se v tomto kroku drží pouze v RAM a po ukončení aplikace se neukládá
 
-Po potvrzení stabilního startu APK následuje krok 2: produktové obrázky a
-vícepoložková poptávka s možností ODEBRAT.
+Po potvrzení stabilního startu následuje krok 3: Moje dotazy a lokální rezervační čísla.
