@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 4 search
+name: Build STABLE RESET v8 step 5 Shop5 catalog
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Verify offline stable step 4 search
-        run: python3 tests/verify_step4.py
+      - name: Verify stable step 5 Shop5 catalog
+        run: python3 tests/verify_step5.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,9 +29,9 @@ jobs:
       - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP4_SEARCH.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP5_SHOP5_CATALOG.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP4-SEARCH
-          path: Kspol_STABLE_RESET_v8_STEP4_SEARCH.apk
+          name: Kspol-STABLE-RESET-v8-STEP5-SHOP5-CATALOG
+          path: Kspol_STABLE_RESET_v8_STEP5_SHOP5_CATALOG.apk
           if-no-files-found: error

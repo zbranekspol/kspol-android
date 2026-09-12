@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Záměrně bez oprávnění INTERNET. -->
+    <!-- Internet se používá pouze po otevření Shop5 katalogu, nikdy při startu. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:allowBackup="false"
         android:icon="@drawable/kspol_logo"
-        android:label="+K spol. STABLE RESET v8 STEP 4"
+        android:label="+K spol. STABLE RESET v8 STEP 5"
         android:roundIcon="@drawable/kspol_logo"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
