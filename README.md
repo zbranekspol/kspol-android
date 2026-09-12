@@ -1,8 +1,8 @@
-# +K spol. — STABLE RESET v8 / krok 6
+# +K spol. — STABLE RESET v8 / krok 7
 
-Navazuje výhradně na uživatelem potvrzený stabilní krok 5. Kód z nestabilní v7 nebyl použit.
+Navazuje výhradně na uživatelem potvrzený stabilní krok 6. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 6
+## Rozsah kroku 7
 
 - zachované logo +K spol.
 - produktové karty s obrázky
@@ -21,6 +21,12 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 5. Kód z nestabiln
 - při chybě aktualizace se použije poslední funkční kopie
 - produkty se zobrazují po 20 položkách, další se načtou tlačítkem
 - zákaznický záznam je vždy dotaz; rezervace vznikne až po pozdějším potvrzení zaměstnancem
+- potvrzení po vytvoření používá text „Dotaz odeslán“
+- každá položka z XML má malý odkaz ZOBRAZIT V E-SHOPU na přesnou produktovou stránku
+- odkazy se otevírají v systémovém prohlížeči a jsou omezené na doménu zbrane-kspol.cz
+- na titulní stránce je vstup PRO ZAMĚSTNANCE
+- zaměstnanecké přihlášení, ADMINISTRAČNÍ ROZHRANÍ, ZMĚNIT HESLO a ODHLÁSIT
+- administrační část je zatím označena jako TEST REŽIM a používá lokální přihlášení
 - bez WebView
 
 Tento krok je určen k samostatnému testu stability před dalším rozšiřováním.

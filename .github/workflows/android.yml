@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 6 home catalog
+name: Build STABLE RESET v8 step 7 shop links and admin entry
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Verify stable step 6 home catalog
-        run: python3 tests/verify_step6.py
+      - name: Verify stable step 7 shop links and admin entry
+        run: python3 tests/verify_step7.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,9 +29,9 @@ jobs:
       - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP6_HOME_CATALOG.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP7_SHOP_LINKS_ADMIN.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP6-HOME-CATALOG
-          path: Kspol_STABLE_RESET_v8_STEP6_HOME_CATALOG.apk
+          name: Kspol-STABLE-RESET-v8-STEP7-SHOP-LINKS-ADMIN
+          path: Kspol_STABLE_RESET_v8_STEP7_SHOP_LINKS_ADMIN.apk
           if-no-files-found: error

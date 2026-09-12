@@ -1,6 +1,7 @@
 package cz.kspol.stableapp.resetv8;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -8,6 +9,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
+import android.net.Uri;
 import android.text.Editable;
 import android.text.Html;
 import android.text.InputType;
@@ -48,7 +50,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 6.
+ * STABLE RESET v8 / krok 7.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -63,6 +65,9 @@ public final class MainActivity extends Activity {
     private static final String INQUIRY_COUNT = "inquiry_count";
     private static final String CATALOG_CACHE_FILE = "shop5_catalog.xml";
     private static final int CATALOG_BATCH_SIZE = 20;
+    private static final String EMPLOYEE_EMAIL = "zbrane.kspol@gmail.com";
+    private static final String EMPLOYEE_PASSWORD_KEY = "employee_password";
+    private static final String DEFAULT_EMPLOYEE_PASSWORD = "123456";
     private static final String CATALOG_FEED_URL =
             "https://www.zbrane-kspol.cz/_obchody/zbrane-kspol.shop5.cz/soubory/"
                     + "xml-feedy-cache/export_google-nakupy-cz-CZK-0-10000-"
@@ -113,7 +118,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         content.addView(label("Katalog", 28, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 6", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 7", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -163,13 +168,17 @@ public final class MainActivity extends Activity {
         myQuestions.setOnClickListener(v -> showMyQuestions());
         addTopMargin(content, myQuestions, 12);
 
+        Button employeeAccess = secondaryButton("PRO ZAMĚSTNANCE");
+        employeeAccess.setOnClickListener(v -> showEmployeeLogin());
+        addTopMargin(content, employeeAccess, 8);
+
         if (!selectedProducts.isEmpty()) {
             Button inquiry = actionButton("MOJE POPTÁVKA (" + selectedProducts.size() + ")", GREEN);
             inquiry.setOnClickListener(v -> showInquiry());
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 6 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                "Krok 7 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
@@ -517,13 +526,14 @@ public final class MainActivity extends Activity {
             String price = "";
             String availability = "";
             String imageUrl = "";
+            String productUrl = "";
             int event = parser.getEventType();
             while (event != XmlPullParser.END_DOCUMENT) {
                 if (event == XmlPullParser.START_TAG) {
                     String tag = localTag(parser.getName());
                     if (tag.equals("item")) {
                         inItem = true;
-                        name = description = category = price = availability = imageUrl = "";
+                        name = description = category = price = availability = imageUrl = productUrl = "";
                     } else if (inItem && isCatalogField(tag)) {
                         String value = parser.nextText();
                         if (tag.equals("title")) name = value;
@@ -532,6 +542,7 @@ public final class MainActivity extends Activity {
                         else if (tag.equals("price")) price = value;
                         else if (tag.equals("availability")) availability = value;
                         else if (tag.equals("image_link") && imageUrl.isEmpty()) imageUrl = value;
+                        else if (tag.equals("link") && productUrl.isEmpty()) productUrl = value;
                     }
                 } else if (event == XmlPullParser.END_TAG
                         && localTag(parser.getName()).equals("item") && inItem) {
@@ -543,7 +554,7 @@ public final class MainActivity extends Activity {
                         if (cleanCategory.isEmpty()) cleanCategory = "Ostatní";
                         String subtitle = formatOffer(price, availability);
                         parsed.add(new Product(cleanName, subtitle, cleanCategory,
-                                R.drawable.product_accessory, cleanDescription, imageUrl));
+                                R.drawable.product_accessory, cleanDescription, imageUrl, productUrl));
                     }
                 }
                 event = parser.next();
@@ -561,7 +572,8 @@ public final class MainActivity extends Activity {
 
     private boolean isCatalogField(String tag) {
         return tag.equals("title") || tag.equals("description") || tag.equals("product_type")
-                || tag.equals("price") || tag.equals("availability") || tag.equals("image_link");
+                || tag.equals("price") || tag.equals("availability") || tag.equals("image_link")
+                || tag.equals("link");
     }
 
     @SuppressWarnings("deprecation")
@@ -617,6 +629,136 @@ public final class MainActivity extends Activity {
         if (backup.exists()) backup.delete();
     }
 
+    private void showEmployeeLogin() {
+        LinearLayout root = createRoot();
+        root.addView(createHeader("PRO ZAMĚSTNANCE"));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        Button back = secondaryButton("← ZPĚT NA KATALOG");
+        back.setOnClickListener(v -> showHomeScreen());
+        content.addView(back);
+        content.addView(label("Přístup pouze pro zaměstnance +K spol. s r.o.",
+                20, BLACK, true));
+        content.addView(label("TEST REŽIM", 13, RED, true));
+
+        EditText email = new EditText(this);
+        email.setHint("E-mail zaměstnance");
+        email.setSingleLine(true);
+        email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        email.setTextSize(16);
+        email.setPadding(dp(16), dp(12), dp(16), dp(12));
+        email.setBackground(rounded(Color.WHITE, BORDER, 14));
+        addTopMargin(content, email, 14);
+
+        EditText password = passwordField("Heslo");
+        addTopMargin(content, password, 10);
+        TextView error = label("", 13, RED, true);
+        error.setVisibility(View.GONE);
+        content.addView(error);
+
+        Button login = actionButton("PŘIHLÁSIT", GREEN);
+        login.setOnClickListener(v -> {
+            String savedPassword = getSharedPreferences(PREFS, MODE_PRIVATE)
+                    .getString(EMPLOYEE_PASSWORD_KEY, DEFAULT_EMPLOYEE_PASSWORD);
+            if (EMPLOYEE_EMAIL.equalsIgnoreCase(email.getText().toString().trim())
+                    && savedPassword.equals(password.getText().toString())) {
+                showAdminScreen();
+            } else {
+                error.setText("Nesprávný e-mail nebo heslo.");
+                error.setVisibility(View.VISIBLE);
+            }
+        });
+        addTopMargin(content, login, 14);
+        scroll.addView(content);
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private void showAdminScreen() {
+        LinearLayout root = createRoot();
+        root.addView(createHeader("ADMINISTRAČNÍ ROZHRANÍ"));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        content.addView(label("TEST REŽIM", 13, RED, true));
+        content.addView(label("Zaměstnanecký vstup je připraven. Připojení dotazů "
+                + "mezi telefony bude následovat v samostatném kroku.",
+                15, Color.DKGRAY, false));
+
+        Button questions = actionButton("DOTAZY ZÁKAZNÍKŮ", GREEN);
+        questions.setOnClickListener(v -> showMyQuestions());
+        addTopMargin(content, questions, 16);
+
+        Button changePassword = secondaryButton("ZMĚNIT HESLO");
+        changePassword.setOnClickListener(v -> showChangePassword());
+        addTopMargin(content, changePassword, 10);
+
+        Button logout = actionButton("ODHLÁSIT", RED);
+        logout.setOnClickListener(v -> showHomeScreen());
+        addTopMargin(content, logout, 10);
+        scroll.addView(content);
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private void showChangePassword() {
+        LinearLayout root = createRoot();
+        root.addView(createHeader("ZMĚNIT HESLO"));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+        Button back = secondaryButton("← ZPĚT DO ADMINISTRACE");
+        back.setOnClickListener(v -> showAdminScreen());
+        content.addView(back);
+
+        EditText current = passwordField("Současné heslo");
+        EditText replacement = passwordField("Nové heslo – nejméně 6 znaků");
+        EditText confirmation = passwordField("Nové heslo znovu");
+        addTopMargin(content, current, 10);
+        addTopMargin(content, replacement, 10);
+        addTopMargin(content, confirmation, 10);
+        TextView error = label("", 13, RED, true);
+        error.setVisibility(View.GONE);
+        content.addView(error);
+
+        Button save = actionButton("ULOŽIT NOVÉ HESLO", GREEN);
+        save.setOnClickListener(v -> {
+            SharedPreferences preferences = getSharedPreferences(PREFS, MODE_PRIVATE);
+            String saved = preferences.getString(EMPLOYEE_PASSWORD_KEY, DEFAULT_EMPLOYEE_PASSWORD);
+            String newPassword = replacement.getText().toString();
+            if (!saved.equals(current.getText().toString())) {
+                error.setText("Současné heslo není správné.");
+                error.setVisibility(View.VISIBLE);
+            } else if (newPassword.length() < 6) {
+                error.setText("Nové heslo musí mít nejméně 6 znaků.");
+                error.setVisibility(View.VISIBLE);
+            } else if (!newPassword.equals(confirmation.getText().toString())) {
+                error.setText("Nová hesla se neshodují.");
+                error.setVisibility(View.VISIBLE);
+            } else {
+                preferences.edit().putString(EMPLOYEE_PASSWORD_KEY, newPassword).apply();
+                Toast.makeText(this, "Heslo bylo změněno.", Toast.LENGTH_SHORT).show();
+                showAdminScreen();
+            }
+        });
+        addTopMargin(content, save, 14);
+        scroll.addView(content);
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private EditText passwordField(String hint) {
+        EditText field = new EditText(this);
+        field.setHint(hint);
+        field.setSingleLine(true);
+        field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        field.setTextSize(16);
+        field.setPadding(dp(16), dp(12), dp(16), dp(12));
+        field.setBackground(rounded(Color.WHITE, BORDER, 14));
+        return field;
+    }
+
     private void showInquiry() {
         LinearLayout root = createRoot();
         root.addView(createHeader("MOJE POPTÁVKA"));
@@ -638,7 +780,7 @@ public final class MainActivity extends Activity {
             save.setOnClickListener(v -> {
                 String questionNumber = saveLocalInquiry();
                 selectedProducts.clear();
-                Toast.makeText(this, "Dotaz uložen. Číslo dotazu: " + questionNumber,
+                Toast.makeText(this, "Dotaz odeslán. Číslo dotazu: " + questionNumber,
                         Toast.LENGTH_LONG).show();
                 showMyQuestions();
             });
@@ -760,6 +902,12 @@ public final class MainActivity extends Activity {
             text.addView(description);
         }
         text.addView(label(product.category, 11, GREEN, true));
+        if (!product.productUrl.isEmpty()) {
+            Button shopLink = secondaryButton("ZOBRAZIT V E-SHOPU ↗");
+            shopLink.setTextSize(11);
+            shopLink.setOnClickListener(v -> openProductInShop(product.productUrl));
+            addTopMargin(text, shopLink, 6);
+        }
         boolean selected = isSelectedProduct(product);
         Button add = actionButton(selected ? "V POPTÁVCE" : "PŘIDAT DO POPTÁVKY",
                 selected ? Color.GRAY : GREEN);
@@ -783,6 +931,21 @@ public final class MainActivity extends Activity {
         params.setMargins(0, dp(8), 0, dp(8));
         card.setLayoutParams(params);
         return card;
+    }
+
+    private void openProductInShop(String productUrl) {
+        try {
+            Uri uri = Uri.parse(productUrl);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || !(host.equals("zbrane-kspol.cz") || host.endsWith(".zbrane-kspol.cz"))) {
+                Toast.makeText(this, "Neplatný odkaz na e-shop.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startActivity(new Intent(Intent.ACTION_VIEW, uri));
+        } catch (Exception ignored) {
+            Toast.makeText(this, "Odkaz se nepodařilo otevřít.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private boolean isSelectedProduct(Product candidate) {
@@ -1003,19 +1166,21 @@ public final class MainActivity extends Activity {
         final int imageRes;
         final String description;
         final String imageUrl;
+        final String productUrl;
 
         Product(String name, String subtitle, String category, int imageRes) {
-            this(name, subtitle, category, imageRes, subtitle, "");
+            this(name, subtitle, category, imageRes, subtitle, "", "");
         }
 
         Product(String name, String subtitle, String category, int imageRes,
-                String description, String imageUrl) {
+                String description, String imageUrl, String productUrl) {
             this.name = name;
             this.subtitle = subtitle;
             this.category = category;
             this.imageRes = imageRes;
             this.description = description == null ? "" : description;
             this.imageUrl = imageUrl == null ? "" : imageUrl.trim();
+            this.productUrl = productUrl == null ? "" : productUrl.trim();
         }
     }
 
