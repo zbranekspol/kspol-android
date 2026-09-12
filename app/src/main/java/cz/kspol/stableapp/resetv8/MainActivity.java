@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -50,7 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 7.
+ * STABLE RESET v8 / krok 8.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -86,6 +87,7 @@ public final class MainActivity extends Activity {
     private TextView searchSummary;
     private LinearLayout searchResults;
     private boolean catalogSearchLoading;
+    private Runnable backAction;
 
     private final String[] shopCategories = new String[]{
             "AKCE", "Bazar, komisní prodej", "Zbraně na ZO", "Zbraně bez ZO",
@@ -112,13 +114,30 @@ public final class MainActivity extends Activity {
         showHomeScreen();
     }
 
+    @SuppressWarnings("deprecation")
+    @Override
+    public void onBackPressed() {
+        if (backAction != null) {
+            Runnable action = backAction;
+            backAction = null;
+            action.run();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    private void goBack() {
+        onBackPressed();
+    }
+
     private void showHomeScreen() {
+        backAction = null;
         LinearLayout root = createRoot();
         root.addView(createHeader("+K SPOL. S R.O."));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("Katalog", 28, BLACK, true));
-        content.addView(label("STABLE RESET v8 • TEST KROK 7", 14, Color.DKGRAY, false));
+        content.addView(label("Ověření dostupnosti na prodejně", 26, BLACK, true));
+        content.addView(label("STABLE RESET v8 • TEST KROK 8", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -165,7 +184,7 @@ public final class MainActivity extends Activity {
         }
 
         Button myQuestions = actionButton("MOJE DOTAZY", GREEN);
-        myQuestions.setOnClickListener(v -> showMyQuestions());
+        myQuestions.setOnClickListener(v -> showMyQuestions(this::showHomeScreen));
         addTopMargin(content, myQuestions, 12);
 
         Button employeeAccess = secondaryButton("PRO ZAMĚSTNANCE");
@@ -178,7 +197,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 7 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                "Krok 8 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
@@ -246,12 +265,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showProducts(String category) {
+        backAction = this::showHomeScreen;
         LinearLayout root = createRoot();
         root.addView(createHeader(category == null ? "VŠECHNY PRODUKTY" : category));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT NA KATALOG");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
         if (!selectedProducts.isEmpty()) {
             Button inquiry = actionButton("MOJE POPTÁVKA (" + selectedProducts.size() + ")", GREEN);
@@ -274,12 +294,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showShopCatalog(String initialCategory) {
+        backAction = this::showHomeScreen;
         LinearLayout root = createRoot();
         root.addView(createHeader("KATALOG E-SHOPU"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT NA KATALOG");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
         TextView status = label("Načítám denní katalog Shop5…", 15, Color.DKGRAY, true);
         content.addView(status);
@@ -296,7 +317,8 @@ public final class MainActivity extends Activity {
                 status.setText("Katalog je aktuální pro dnešní cyklus od 6:00.");
                 renderShopCategories(categories);
             } else {
-                showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1);
+                showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1,
+                        this::showHomeScreen);
             }
             return;
         }
@@ -320,7 +342,8 @@ public final class MainActivity extends Activity {
                                     + catalogProducts.size());
                     renderShopCategories(categories);
                 } else {
-                    showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1);
+                    showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1,
+                            this::showHomeScreen);
                 }
             });
         }, "shop5-catalog-loader").start();
@@ -333,7 +356,8 @@ public final class MainActivity extends Activity {
             List<Product> matches = productsForTopCategory(category);
             String title = matches.isEmpty() ? category : category + " (" + matches.size() + ")";
             TextView card = categoryCard(title, false);
-            card.setOnClickListener(v -> showShopCategory(category, matches, 1));
+            card.setOnClickListener(v -> showShopCategory(category, matches, 1,
+                    this::showShopCatalog));
             target.addView(card);
         }
         List<Product> uncategorized = new ArrayList<>();
@@ -351,18 +375,21 @@ public final class MainActivity extends Activity {
         }
         if (!uncategorized.isEmpty()) {
             TextView other = categoryCard("Ostatní (" + uncategorized.size() + ")", false);
-            other.setOnClickListener(v -> showShopCategory("Ostatní", uncategorized, 1));
+            other.setOnClickListener(v -> showShopCategory("Ostatní", uncategorized, 1,
+                    this::showShopCatalog));
             target.addView(other);
         }
     }
 
-    private void showShopCategory(String title, List<Product> categoryProducts, int depth) {
+    private void showShopCategory(String title, List<Product> categoryProducts, int depth,
+            Runnable parentAction) {
+        backAction = parentAction;
         LinearLayout root = createRoot();
         root.addView(createHeader(title.toUpperCase(Locale.getDefault())));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← VŠECHNY KATEGORIE");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
 
         Set<String> subcategories = new LinkedHashSet<>();
@@ -383,7 +410,8 @@ public final class MainActivity extends Activity {
                     }
                 }
                 TextView card = categoryCard(subcategory + " (" + subset.size() + ")", false);
-                card.setOnClickListener(v -> showShopCategory(subcategory, subset, depth + 1));
+                card.setOnClickListener(v -> showShopCategory(subcategory, subset, depth + 1,
+                        () -> showShopCategory(title, categoryProducts, depth, parentAction)));
                 content.addView(card);
             }
         }
@@ -630,12 +658,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showEmployeeLogin() {
+        backAction = this::showHomeScreen;
         LinearLayout root = createRoot();
         root.addView(createHeader("PRO ZAMĚSTNANCE"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT NA KATALOG");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
         content.addView(label("Přístup pouze pro zaměstnance +K spol. s r.o.",
                 20, BLACK, true));
@@ -676,6 +705,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showAdminScreen() {
+        backAction = this::showEmployeeLogin;
         LinearLayout root = createRoot();
         root.addView(createHeader("ADMINISTRAČNÍ ROZHRANÍ"));
         ScrollView scroll = new ScrollView(this);
@@ -686,7 +716,7 @@ public final class MainActivity extends Activity {
                 15, Color.DKGRAY, false));
 
         Button questions = actionButton("DOTAZY ZÁKAZNÍKŮ", GREEN);
-        questions.setOnClickListener(v -> showMyQuestions());
+        questions.setOnClickListener(v -> showMyQuestions(this::showAdminScreen));
         addTopMargin(content, questions, 16);
 
         Button changePassword = secondaryButton("ZMĚNIT HESLO");
@@ -703,12 +733,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showChangePassword() {
+        backAction = this::showAdminScreen;
         LinearLayout root = createRoot();
         root.addView(createHeader("ZMĚNIT HESLO"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT DO ADMINISTRACE");
-        back.setOnClickListener(v -> showAdminScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
 
         EditText current = passwordField("Současné heslo");
@@ -760,12 +791,13 @@ public final class MainActivity extends Activity {
     }
 
     private void showInquiry() {
+        backAction = this::showHomeScreen;
         LinearLayout root = createRoot();
         root.addView(createHeader("MOJE POPTÁVKA"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT NA KATALOG");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
         content.addView(label("Vybrané položky: " + selectedProducts.size(), 20, BLACK, true));
         if (selectedProducts.isEmpty()) {
@@ -782,7 +814,7 @@ public final class MainActivity extends Activity {
                 selectedProducts.clear();
                 Toast.makeText(this, "Dotaz odeslán. Číslo dotazu: " + questionNumber,
                         Toast.LENGTH_LONG).show();
-                showMyQuestions();
+                showMyQuestions(this::showHomeScreen);
             });
             addTopMargin(content, save, 18);
         }
@@ -792,13 +824,14 @@ public final class MainActivity extends Activity {
         root.requestApplyInsets();
     }
 
-    private void showMyQuestions() {
+    private void showMyQuestions(Runnable parentAction) {
+        backAction = parentAction;
         LinearLayout root = createRoot();
         root.addView(createHeader("MOJE DOTAZY"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
         Button back = secondaryButton("← ZPĚT NA KATALOG");
-        back.setOnClickListener(v -> showHomeScreen());
+        back.setOnClickListener(v -> goBack());
         content.addView(back);
         List<Inquiry> inquiries = loadLocalInquiries();
         content.addView(label("Uložené dotazy: " + inquiries.size(), 20, BLACK, true));
@@ -1055,20 +1088,36 @@ public final class MainActivity extends Activity {
         return root;
     }
 
-    private LinearLayout createHeader(String title) {
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(18), dp(10), dp(18), dp(10));
-        header.setBackgroundColor(GREEN);
+    private View createHeader(String title) {
+        FrameLayout header = new FrameLayout(this);
+        ImageView background = new ImageView(this);
+        background.setImageResource(R.drawable.kspol_facebook_header_bg);
+        background.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        header.addView(background, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
+
+        View shade = new View(this);
+        shade.setBackgroundColor(Color.argb(125, 0, 0, 0));
+        header.addView(shade, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
+
+        LinearLayout foreground = new LinearLayout(this);
+        foreground.setGravity(Gravity.CENTER_VERTICAL);
+        foreground.setPadding(dp(14), dp(8), dp(18), dp(8));
         ImageView logo = new ImageView(this);
-        logo.setImageResource(R.drawable.kspol_logo);
+        logo.setImageResource(R.drawable.kspol_shop_logo);
         logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        header.addView(logo, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        logo.setBackgroundColor(Color.WHITE);
+        logo.setPadding(dp(4), dp(4), dp(4), dp(4));
+        foreground.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(64)));
         TextView brand = label(title, 20, Color.WHITE, true);
+        brand.setShadowLayer(4f, 0f, 1f, Color.BLACK);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         brandParams.setMargins(dp(12), 0, 0, 0);
-        header.addView(brand, brandParams);
+        foreground.addView(brand, brandParams);
+        header.addView(foreground, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
         return header;
     }
 
