@@ -5,7 +5,7 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/kspol_logo"
-        android:label="+K spol. STABLE RESET v8 STEP 3"
+        android:label="+K spol. STABLE RESET v8 STEP 4"
         android:roundIcon="@drawable/kspol_logo"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
