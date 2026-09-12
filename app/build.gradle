@@ -1,0 +1,31 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'cz.kspol.stableapp.resetv8'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'cz.kspol.stableapp.resetv8'
+        minSdk 23
+        targetSdk 36
+        versionCode 801
+        versionName '8.0-step1'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix '.test'
+            versionNameSuffix '-test'
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+}

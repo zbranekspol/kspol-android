@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/kspol_paper</item>
+        <item name="android:colorAccent">@color/kspol_gold</item>
+        <item name="android:statusBarColor">@color/kspol_green</item>
+        <item name="android:navigationBarColor">@color/kspol_black</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
