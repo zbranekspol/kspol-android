@@ -1,13 +1,17 @@
-# +K spol. — STABLE RESET v8 / krok 9
+# +K spol. — STABLE RESET v8 / krok 10
 
-Navazuje výhradně na uživatelem potvrzený stabilní krok 8. Kód z nestabilní v7 nebyl použit.
+Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 9
+## Rozsah kroku 10
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
 - text „Ověření dostupnosti produktů na prodejně“ je přímo v hlavním záhlaví
 - duplicitní nadpis pod záhlavím byl odstraněn
+- drobečková cesta je v záhlaví malým písmem a ukazuje aktuální kategorii i podkategorii
+- klepnutí na drobečkovou cestu vrací o jednu úroveň výš
+- každá kategorie a podkategorie má vlastní pole hledání hned pod záhlavím
+- hledání filtruje pouze názvy a popisy produktů v právě otevřené části katalogu
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace
 - produktové karty s obrázky
 - vícepoložková poptávka s možností ODEBRAT

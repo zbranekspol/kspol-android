@@ -51,7 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 9.
+ * STABLE RESET v8 / krok 10.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -136,7 +136,7 @@ public final class MainActivity extends Activity {
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 9", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 10", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -196,7 +196,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 9 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                "Krok 10 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
@@ -317,7 +317,7 @@ public final class MainActivity extends Activity {
                 renderShopCategories(categories);
             } else {
                 showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1,
-                        this::showHomeScreen);
+                        this::showHomeScreen, "Domů › " + initialCategory);
             }
             return;
         }
@@ -342,7 +342,7 @@ public final class MainActivity extends Activity {
                     renderShopCategories(categories);
                 } else {
                     showShopCategory(initialCategory, productsForTopCategory(initialCategory), 1,
-                            this::showHomeScreen);
+                            this::showHomeScreen, "Domů › " + initialCategory);
                 }
             });
         }, "shop5-catalog-loader").start();
@@ -356,7 +356,7 @@ public final class MainActivity extends Activity {
             String title = matches.isEmpty() ? category : category + " (" + matches.size() + ")";
             TextView card = categoryCard(title, false);
             card.setOnClickListener(v -> showShopCategory(category, matches, 1,
-                    this::showShopCatalog));
+                    this::showShopCatalog, "Domů › " + category));
             target.addView(card);
         }
         List<Product> uncategorized = new ArrayList<>();
@@ -375,21 +375,42 @@ public final class MainActivity extends Activity {
         if (!uncategorized.isEmpty()) {
             TextView other = categoryCard("Ostatní (" + uncategorized.size() + ")", false);
             other.setOnClickListener(v -> showShopCategory("Ostatní", uncategorized, 1,
-                    this::showShopCatalog));
+                    this::showShopCatalog, "Domů › Ostatní"));
             target.addView(other);
         }
     }
 
     private void showShopCategory(String title, List<Product> categoryProducts, int depth,
-            Runnable parentAction) {
+            Runnable parentAction, String breadcrumbPath) {
         backAction = parentAction;
         LinearLayout root = createRoot();
-        root.addView(createHeader(title.toUpperCase(Locale.getDefault())));
+        root.addView(createHeader(title.toUpperCase(Locale.getDefault()), breadcrumbPath));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        Button back = secondaryButton("← VŠECHNY KATEGORIE");
+
+        EditText categorySearch = new EditText(this);
+        categorySearch.setHint("Hledat v této kategorii podle názvu nebo popisu…");
+        categorySearch.setSingleLine(true);
+        categorySearch.setInputType(InputType.TYPE_CLASS_TEXT);
+        categorySearch.setTextSize(15);
+        categorySearch.setTextColor(BLACK);
+        categorySearch.setHintTextColor(Color.GRAY);
+        categorySearch.setPadding(dp(16), dp(12), dp(16), dp(12));
+        categorySearch.setBackground(rounded(Color.WHITE, BORDER, 14));
+        content.addView(categorySearch);
+
+        Button back = secondaryButton("← O ÚROVEŇ VÝŠ");
         back.setOnClickListener(v -> goBack());
-        content.addView(back);
+        addTopMargin(content, back, 8);
+
+        LinearLayout defaultSection = new LinearLayout(this);
+        defaultSection.setOrientation(LinearLayout.VERTICAL);
+        content.addView(defaultSection);
+
+        LinearLayout filteredSection = new LinearLayout(this);
+        filteredSection.setOrientation(LinearLayout.VERTICAL);
+        filteredSection.setVisibility(View.GONE);
+        content.addView(filteredSection);
 
         Set<String> subcategories = new LinkedHashSet<>();
         for (Product product : categoryProducts) {
@@ -399,7 +420,7 @@ public final class MainActivity extends Activity {
             }
         }
         if (!subcategories.isEmpty()) {
-            content.addView(label("Podkategorie", 20, BLACK, true));
+            defaultSection.addView(label("Podkategorie", 20, BLACK, true));
             for (String subcategory : subcategories) {
                 List<Product> subset = new ArrayList<>();
                 for (Product product : categoryProducts) {
@@ -410,19 +431,58 @@ public final class MainActivity extends Activity {
                 }
                 TextView card = categoryCard(subcategory + " (" + subset.size() + ")", false);
                 card.setOnClickListener(v -> showShopCategory(subcategory, subset, depth + 1,
-                        () -> showShopCategory(title, categoryProducts, depth, parentAction)));
-                content.addView(card);
+                        () -> showShopCategory(title, categoryProducts, depth, parentAction,
+                                breadcrumbPath),
+                        breadcrumbPath + " › " + subcategory));
+                defaultSection.addView(card);
             }
         }
 
         TextView count = label("Zboží v kategorii: " + categoryProducts.size(), 20, BLACK, true);
-        addTopMargin(content, count, 14);
+        addTopMargin(defaultSection, count, 14);
         if (categoryProducts.isEmpty()) {
-            content.addView(label("V této kategorii nyní není aktivní zboží.",
+            defaultSection.addView(label("V této kategorii nyní není aktivní zboží.",
                     15, Color.DKGRAY, false));
         } else {
-            appendProductBatch(content, categoryProducts, 0);
+            appendProductBatch(defaultSection, categoryProducts, 0);
         }
+
+        categorySearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence value, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence value, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable value) {
+                String query = value.toString().trim().toLowerCase(Locale.getDefault());
+                filteredSection.removeAllViews();
+                if (query.isEmpty()) {
+                    filteredSection.setVisibility(View.GONE);
+                    defaultSection.setVisibility(View.VISIBLE);
+                    return;
+                }
+                List<Product> matches = new ArrayList<>();
+                for (Product product : categoryProducts) {
+                    String searchable = (product.name + " " + product.description)
+                            .toLowerCase(Locale.getDefault());
+                    if (searchable.contains(query)) {
+                        matches.add(product);
+                    }
+                }
+                defaultSection.setVisibility(View.GONE);
+                filteredSection.setVisibility(View.VISIBLE);
+                filteredSection.addView(label(matches.isEmpty()
+                        ? "Žádný produkt v této kategorii nenalezen"
+                        : "Nalezené produkty: " + matches.size(), 15, Color.DKGRAY, true));
+                if (!matches.isEmpty()) {
+                    appendProductBatch(filteredSection, matches, 0);
+                }
+            }
+        });
         scroll.addView(content);
         root.addView(scroll, matchRemaining());
         setContentView(root);
@@ -1088,17 +1148,21 @@ public final class MainActivity extends Activity {
     }
 
     private View createHeader(String title) {
+        return createHeader(title, "Domů");
+    }
+
+    private View createHeader(String title, String breadcrumbPath) {
         FrameLayout header = new FrameLayout(this);
         ImageView background = new ImageView(this);
         background.setImageResource(R.drawable.kspol_facebook_header_bg);
         background.setScaleType(ImageView.ScaleType.CENTER_CROP);
         header.addView(background, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(108)));
 
         View shade = new View(this);
         shade.setBackgroundColor(Color.argb(125, 0, 0, 0));
         header.addView(shade, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(108)));
 
         LinearLayout foreground = new LinearLayout(this);
         foreground.setGravity(Gravity.CENTER_VERTICAL);
@@ -1109,14 +1173,25 @@ public final class MainActivity extends Activity {
         logo.setBackgroundColor(Color.WHITE);
         logo.setPadding(dp(4), dp(4), dp(4), dp(4));
         foreground.addView(logo, new LinearLayout.LayoutParams(dp(96), dp(64)));
-        TextView brand = label(title, 20, Color.WHITE, true);
+        LinearLayout titles = new LinearLayout(this);
+        titles.setOrientation(LinearLayout.VERTICAL);
+        TextView brand = label(title, 18, Color.WHITE, true);
         brand.setShadowLayer(4f, 0f, 1f, Color.BLACK);
+        titles.addView(brand);
+        TextView breadcrumb = label(breadcrumbPath, 11, Color.rgb(225, 235, 230), false);
+        breadcrumb.setSingleLine(true);
+        breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.START);
+        breadcrumb.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+        if (backAction != null) {
+            breadcrumb.setOnClickListener(v -> goBack());
+        }
+        titles.addView(breadcrumb);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         brandParams.setMargins(dp(12), 0, 0, 0);
-        foreground.addView(brand, brandParams);
+        foreground.addView(titles, brandParams);
         header.addView(foreground, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(92)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(108)));
         return header;
     }
 

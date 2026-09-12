@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 9 header title
+name: Build STABLE RESET v8 step 10 breadcrumb and category search
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Verify stable step 9 header title
-        run: python3 tests/verify_step9.py
+      - name: Verify stable step 10 breadcrumb and category search
+        run: python3 tests/verify_step10.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,9 +29,9 @@ jobs:
       - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP9_HEADER_TITLE.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP10_BREADCRUMB_SEARCH.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP9-HEADER-TITLE
-          path: Kspol_STABLE_RESET_v8_STEP9_HEADER_TITLE.apk
+          name: Kspol-STABLE-RESET-v8-STEP10-BREADCRUMB-SEARCH
+          path: Kspol_STABLE_RESET_v8_STEP10_BREADCRUMB_SEARCH.apk
           if-no-files-found: error
