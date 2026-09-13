@@ -17,6 +17,7 @@ import android.text.TextWatcher;
 import android.util.LruCache;
 import android.util.Xml;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -51,7 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 10.
+ * STABLE RESET v8 / krok 11.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -69,7 +70,10 @@ public final class MainActivity extends Activity {
     private static final String EMPLOYEE_EMAIL = "zbrane.kspol@gmail.com";
     private static final String EMPLOYEE_PASSWORD_KEY = "employee_password";
     private static final String DEFAULT_EMPLOYEE_PASSWORD = "123456";
-    private static final String CATALOG_FEED_URL =
+    private static final String CATALOG_FEED_URL_KEY = "catalog_feed_url";
+    private static final String DEFAULT_CATALOG_FEED_URL =
+            "https://www.zbrane-kspol.cz/exports/univ.php?id=1";
+    private static final String FALLBACK_CATALOG_FEED_URL =
             "https://www.zbrane-kspol.cz/_obchody/zbrane-kspol.shop5.cz/soubory/"
                     + "xml-feedy-cache/export_google-nakupy-cz-CZK-0-10000-"
                     + "mFrQECY6NUOJ7o1Q-jpeg.xml";
@@ -88,6 +92,9 @@ public final class MainActivity extends Activity {
     private LinearLayout searchResults;
     private boolean catalogSearchLoading;
     private Runnable backAction;
+    private float gestureStartX;
+    private float gestureStartY;
+    private long gestureStartTime;
 
     private final String[] shopCategories = new String[]{
             "AKCE", "Bazar, komisní prodej", "Zbraně na ZO", "Zbraně bez ZO",
@@ -130,13 +137,32 @@ public final class MainActivity extends Activity {
         onBackPressed();
     }
 
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+            gestureStartX = event.getX();
+            gestureStartY = event.getY();
+            gestureStartTime = System.currentTimeMillis();
+        } else if (event.getActionMasked() == MotionEvent.ACTION_UP && backAction != null) {
+            float deltaX = event.getX() - gestureStartX;
+            float deltaY = event.getY() - gestureStartY;
+            long duration = System.currentTimeMillis() - gestureStartTime;
+            if (deltaX < -dp(72) && Math.abs(deltaX) > Math.abs(deltaY) * 1.5f
+                    && duration < 1_200) {
+                goBack();
+                return true;
+            }
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
     private void showHomeScreen() {
         backAction = null;
         LinearLayout root = createRoot();
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 10", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 11", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -196,7 +222,8 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 10 zobrazuje všechny kategorie Shop5 přímo na titulní stránce. "
+                "Krok 11 zobrazuje pouze produkty označené e-shopem jako skladem. "
+                        + "Drobečková cesta ukazuje aktuální kategorii i podkategorii. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
                 13, Color.DKGRAY, false);
@@ -556,8 +583,18 @@ public final class MainActivity extends Activity {
 
         File temporary = new File(getFilesDir(), CATALOG_CACHE_FILE + ".tmp");
         try {
-            downloadCatalog(temporary);
-            List<Product> downloaded = parseCatalog(temporary);
+            String requestedFeed = catalogFeedUrl();
+            List<Product> downloaded;
+            try {
+                downloadCatalog(temporary, requestedFeed);
+                downloaded = parseCatalog(temporary);
+            } catch (Exception primaryFailure) {
+                downloaded = new ArrayList<>();
+            }
+            if (downloaded.isEmpty() && !FALLBACK_CATALOG_FEED_URL.equals(requestedFeed)) {
+                downloadCatalog(temporary, FALLBACK_CATALOG_FEED_URL);
+                downloaded = parseCatalog(temporary);
+            }
             if (downloaded.isEmpty()) {
                 throw new IllegalStateException("Prázdný XML katalog");
             }
@@ -573,8 +610,8 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void downloadCatalog(File target) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(CATALOG_FEED_URL).openConnection();
+    private void downloadCatalog(File target, String feedUrl) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(feedUrl).openConnection();
         connection.setConnectTimeout(20_000);
         connection.setReadTimeout(90_000);
         connection.setRequestProperty("User-Agent", "+K-spol-Android/8.0");
@@ -598,6 +635,11 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private String catalogFeedUrl() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getString(CATALOG_FEED_URL_KEY, DEFAULT_CATALOG_FEED_URL);
+    }
+
     private List<Product> parseCatalog(File file) {
         List<Product> parsed = new ArrayList<>();
         if (file == null || !file.isFile() || file.length() == 0) {
@@ -618,28 +660,33 @@ public final class MainActivity extends Activity {
             while (event != XmlPullParser.END_DOCUMENT) {
                 if (event == XmlPullParser.START_TAG) {
                     String tag = localTag(parser.getName());
-                    if (tag.equals("item")) {
+                    if (isCatalogItemTag(tag)) {
                         inItem = true;
                         name = description = category = price = availability = imageUrl = productUrl = "";
                     } else if (inItem && isCatalogField(tag)) {
                         String value = parser.nextText();
-                        if (tag.equals("title")) name = value;
+                        if (tag.equals("title") || tag.equals("productname")) name = value;
+                        else if (tag.equals("product") && name.isEmpty()) name = value;
                         else if (tag.equals("description")) description = value;
-                        else if (tag.equals("product_type")) category = value;
-                        else if (tag.equals("price")) price = value;
+                        else if (tag.equals("product_type") || tag.equals("categorytext")) category = value;
+                        else if (tag.equals("price") || tag.equals("price_vat")) price = value;
                         else if (tag.equals("availability")) availability = value;
-                        else if (tag.equals("image_link") && imageUrl.isEmpty()) imageUrl = value;
-                        else if (tag.equals("link") && productUrl.isEmpty()) productUrl = value;
+                        else if (tag.equals("delivery_date")) availability = "delivery_date:" + value;
+                        else if (tag.equals("stock_quantity")) availability = "stock_quantity:" + value;
+                        else if ((tag.equals("image_link") || tag.equals("imgurl"))
+                                && imageUrl.isEmpty()) imageUrl = value;
+                        else if ((tag.equals("link") || tag.equals("url"))
+                                && productUrl.isEmpty()) productUrl = value;
                     }
                 } else if (event == XmlPullParser.END_TAG
-                        && localTag(parser.getName()).equals("item") && inItem) {
+                        && isCatalogItemTag(localTag(parser.getName())) && inItem) {
                     inItem = false;
                     String cleanName = cleanHtml(name);
-                    if (!cleanName.isEmpty()) {
+                    if (!cleanName.isEmpty() && isInStock(availability)) {
                         String cleanDescription = cleanHtml(description);
                         String cleanCategory = cleanHtml(category);
                         if (cleanCategory.isEmpty()) cleanCategory = "Ostatní";
-                        String subtitle = formatOffer(price, availability);
+                        String subtitle = formatOffer(price, "in stock");
                         parsed.add(new Product(cleanName, subtitle, cleanCategory,
                                 R.drawable.product_accessory, cleanDescription, imageUrl, productUrl));
                     }
@@ -654,13 +701,41 @@ public final class MainActivity extends Activity {
 
     private String localTag(String tag) {
         int colon = tag == null ? -1 : tag.indexOf(':');
-        return colon >= 0 ? tag.substring(colon + 1) : (tag == null ? "" : tag);
+        String local = colon >= 0 ? tag.substring(colon + 1) : (tag == null ? "" : tag);
+        return local.toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isCatalogItemTag(String tag) {
+        return tag.equals("item") || tag.equals("shopitem");
     }
 
     private boolean isCatalogField(String tag) {
-        return tag.equals("title") || tag.equals("description") || tag.equals("product_type")
-                || tag.equals("price") || tag.equals("availability") || tag.equals("image_link")
-                || tag.equals("link");
+        return tag.equals("title") || tag.equals("productname") || tag.equals("product")
+                || tag.equals("description") || tag.equals("product_type")
+                || tag.equals("categorytext") || tag.equals("price") || tag.equals("price_vat")
+                || tag.equals("availability") || tag.equals("delivery_date")
+                || tag.equals("stock_quantity") || tag.equals("image_link")
+                || tag.equals("imgurl") || tag.equals("link") || tag.equals("url");
+    }
+
+    private boolean isInStock(String availability) {
+        String normalized = cleanHtml(availability).toLowerCase(Locale.ROOT).trim();
+        if (normalized.equals("in stock") || normalized.equals("in_stock")
+                || normalized.equals("instock") || normalized.equals("skladem")) {
+            return true;
+        }
+        if (normalized.startsWith("delivery_date:")) {
+            return normalized.substring("delivery_date:".length()).trim().matches("0+(?:[.,]0+)?");
+        }
+        if (normalized.startsWith("stock_quantity:")) {
+            try {
+                return Double.parseDouble(normalized.substring("stock_quantity:".length())
+                        .trim().replace(',', '.')) > 0;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("deprecation")
@@ -782,9 +857,66 @@ public final class MainActivity extends Activity {
         changePassword.setOnClickListener(v -> showChangePassword());
         addTopMargin(content, changePassword, 10);
 
+        Button catalogSettings = secondaryButton("NASTAVENÍ FEEDU KATALOGU");
+        catalogSettings.setOnClickListener(v -> showCatalogFeedSettings());
+        addTopMargin(content, catalogSettings, 10);
+
         Button logout = actionButton("ODHLÁSIT", RED);
         logout.setOnClickListener(v -> showHomeScreen());
         addTopMargin(content, logout, 10);
+        scroll.addView(content);
+        root.addView(scroll, matchRemaining());
+        setContentView(root);
+        root.requestApplyInsets();
+    }
+
+    private void showCatalogFeedSettings() {
+        backAction = this::showAdminScreen;
+        LinearLayout root = createRoot();
+        root.addView(createHeader("NASTAVENÍ FEEDU KATALOGU", "Domů › Administrace › Feed"));
+        ScrollView scroll = new ScrollView(this);
+        LinearLayout content = verticalContainer();
+
+        EditText feedUrl = new EditText(this);
+        feedUrl.setHint("HTTPS adresa XML feedu Shop5");
+        feedUrl.setSingleLine(true);
+        feedUrl.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        feedUrl.setText(catalogFeedUrl());
+        feedUrl.setTextSize(14);
+        feedUrl.setPadding(dp(16), dp(12), dp(16), dp(12));
+        feedUrl.setBackground(rounded(Color.WHITE, BORDER, 14));
+        content.addView(feedUrl);
+        content.addView(label("Feed se ukládá pouze do tohoto telefonu. Katalog se obnovuje "
+                + "nejvýše jednou denně po 6:00 a aplikace zobrazí jen položky skladem.",
+                14, Color.DKGRAY, false));
+
+        TextView error = label("", 13, RED, true);
+        error.setVisibility(View.GONE);
+        content.addView(error);
+
+        Button save = actionButton("ULOŽIT FEED", GREEN);
+        save.setOnClickListener(v -> {
+            String value = feedUrl.getText().toString().trim();
+            Uri uri = Uri.parse(value);
+            if (!"https".equalsIgnoreCase(uri.getScheme())
+                    || !"www.zbrane-kspol.cz".equalsIgnoreCase(uri.getHost())) {
+                error.setText("Použijte HTTPS adresu feedu z domény www.zbrane-kspol.cz.");
+                error.setVisibility(View.VISIBLE);
+                return;
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString(CATALOG_FEED_URL_KEY, value).apply();
+            File cache = catalogCacheFile();
+            if (cache.exists()) cache.delete();
+            catalogProducts.clear();
+            Toast.makeText(this, "Feed katalogu byl uložen.", Toast.LENGTH_SHORT).show();
+            showAdminScreen();
+        });
+        addTopMargin(content, save, 14);
+
+        Button back = secondaryButton("← ZPĚT DO ADMINISTRACE");
+        back.setOnClickListener(v -> goBack());
+        addTopMargin(content, back, 10);
         scroll.addView(content);
         root.addView(scroll, matchRemaining());
         setContentView(root);
@@ -1152,6 +1284,9 @@ public final class MainActivity extends Activity {
     }
 
     private View createHeader(String title, String breadcrumbPath) {
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+
         FrameLayout header = new FrameLayout(this);
         ImageView background = new ImageView(this);
         background.setImageResource(R.drawable.kspol_facebook_header_bg);
@@ -1178,21 +1313,43 @@ public final class MainActivity extends Activity {
         TextView brand = label(title, 18, Color.WHITE, true);
         brand.setShadowLayer(4f, 0f, 1f, Color.BLACK);
         titles.addView(brand);
-        TextView breadcrumb = label(breadcrumbPath, 11, Color.rgb(225, 235, 230), false);
-        breadcrumb.setSingleLine(true);
-        breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.START);
-        breadcrumb.setShadowLayer(3f, 0f, 1f, Color.BLACK);
-        if (backAction != null) {
-            breadcrumb.setOnClickListener(v -> goBack());
-        }
-        titles.addView(breadcrumb);
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        brandParams.setMargins(dp(12), 0, 0, 0);
+        brandParams.setMargins(dp(12), 0, dp(48), 0);
         foreground.addView(titles, brandParams);
         header.addView(foreground, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(108)));
-        return header;
+
+        ImageView cart = new ImageView(this);
+        cart.setImageResource(R.drawable.ic_inquiry_cart);
+        cart.setContentDescription("Otevřít poptávku, položek: " + selectedProducts.size());
+        cart.setPadding(dp(9), dp(9), dp(9), dp(9));
+        cart.setBackground(rounded(Color.argb(185, 18, 61, 47), Color.WHITE, 18));
+        cart.setOnClickListener(v -> {
+            if (selectedProducts.isEmpty()) {
+                Toast.makeText(this, "Poptávka je prázdná.", Toast.LENGTH_SHORT).show();
+            } else {
+                showInquiry();
+            }
+        });
+        FrameLayout.LayoutParams cartParams = new FrameLayout.LayoutParams(dp(44), dp(44));
+        cartParams.gravity = Gravity.TOP | Gravity.END;
+        cartParams.setMargins(0, dp(10), dp(12), 0);
+        header.addView(cart, cartParams);
+        block.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(108)));
+
+        TextView breadcrumb = label(breadcrumbPath, 12, GREEN, true);
+        breadcrumb.setSingleLine(true);
+        breadcrumb.setEllipsize(android.text.TextUtils.TruncateAt.START);
+        breadcrumb.setPadding(dp(16), dp(9), dp(16), dp(9));
+        breadcrumb.setBackgroundColor(Color.WHITE);
+        if (backAction != null) {
+            breadcrumb.setOnClickListener(v -> goBack());
+        }
+        block.addView(breadcrumb, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return block;
     }
 
     private LinearLayout verticalContainer() {

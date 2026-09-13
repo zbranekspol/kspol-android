@@ -1,15 +1,17 @@
-# +K spol. — STABLE RESET v8 / krok 10
+# +K spol. — STABLE RESET v8 / krok 11
 
 Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 10
+## Rozsah kroku 11
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
 - text „Ověření dostupnosti produktů na prodejně“ je přímo v hlavním záhlaví
 - duplicitní nadpis pod záhlavím byl odstraněn
-- drobečková cesta je v záhlaví malým písmem a ukazuje aktuální kategorii i podkategorii
+- ikona košíku je v pravém horním rohu obrázku záhlaví a otevírá celou poptávku
+- drobečková cesta je pod obrázkem záhlaví, nad vyhledáváním, a ukazuje aktuální kategorii i podkategorii
 - klepnutí na drobečkovou cestu vrací o jednu úroveň výš
+- gesto zprava doleva provede stejný krok zpět jako drobečková cesta
 - každá kategorie a podkategorie má vlastní pole hledání hned pod záhlavím
 - hledání filtruje pouze názvy a popisy produktů v právě otevřené části katalogu
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace
@@ -20,6 +22,9 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabiln
 - nápověda „Hledat podle názvu nebo popisu…“
 - okamžité výsledky při psaní
 - hledání pouze podle názvu produktu a jeho popisu
+- parser podporuje Google i vlastní Heureka XML Shop5 a zahazuje vše, co není výslovně skladem
+- URL feedu lze změnit pouze v zaměstnanecké administraci a uloží se lokálně v telefonu
+- denní cache se obnovuje po 6:00
 - všech 25 hlavních kategorií Shop5 je přímo pod vyhledáváním na titulní stránce
 - šest původních výběrových kategorií a tlačítko ZOBRAZIT VŠE byly odstraněny
 - kategorie, podkategorie a aktivní zboží se čtou z denního XML katalogu Shop5

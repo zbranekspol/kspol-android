@@ -10,8 +10,8 @@ android {
         applicationId 'cz.kspol.stableapp.resetv8'
         minSdk 23
         targetSdk 36
-        versionCode 810
-        versionName '8.0-step10-breadcrumb-category-search'
+        versionCode 811
+        versionName '8.0-step11-cart-swipe-stock-feed'
     }
 
     compileOptions {
