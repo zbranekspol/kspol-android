@@ -1,4 +1,4 @@
-name: Build STABLE RESET v8 step 11 cart swipe and stock feed
+name: Build STABLE RESET v8 step 12 system back gesture
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Verify stable step 11 cart swipe and stock feed
-        run: python3 tests/verify_step11.py
+      - name: Verify stable step 12 system back gesture
+        run: python3 tests/verify_step12.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,9 +29,9 @@ jobs:
       - name: Build test APK
         run: gradle --no-daemon clean assembleDebug
       - name: Prepare test file
-        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP11_CART_SWIPE_STOCK_FEED.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk Kspol_STABLE_RESET_v8_STEP12_SYSTEM_BACK_GESTURE.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: Kspol-STABLE-RESET-v8-STEP11-CART-SWIPE-STOCK-FEED
-          path: Kspol_STABLE_RESET_v8_STEP11_CART_SWIPE_STOCK_FEED.apk
+          name: Kspol-STABLE-RESET-v8-STEP12-SYSTEM-BACK-GESTURE
+          path: Kspol_STABLE_RESET_v8_STEP12_SYSTEM_BACK_GESTURE.apk
           if-no-files-found: error

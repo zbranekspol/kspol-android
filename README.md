@@ -1,8 +1,8 @@
-# +K spol. — STABLE RESET v8 / krok 11
+# +K spol. — STABLE RESET v8 / krok 12
 
 Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 11
+## Rozsah kroku 12
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
@@ -11,7 +11,8 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabiln
 - ikona košíku je v pravém horním rohu obrázku záhlaví a otevírá celou poptávku
 - drobečková cesta je pod obrázkem záhlaví, nad vyhledáváním, a ukazuje aktuální kategorii i podkategorii
 - klepnutí na drobečkovou cestu vrací o jednu úroveň výš
-- gesto zprava doleva provede stejný krok zpět jako drobečková cesta
+- systémové gesto Zpět z levého i pravého okraje provede stejný krok zpět jako drobečková cesta
+- vlastní gesto zprava doleva uvnitř obsahu zůstává podporované
 - každá kategorie a podkategorie má vlastní pole hledání hned pod záhlavím
 - hledání filtruje pouze názvy a popisy produktů v právě otevřené části katalogu
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace

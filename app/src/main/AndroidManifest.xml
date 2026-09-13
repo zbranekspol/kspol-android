@@ -6,7 +6,8 @@
     <application
         android:allowBackup="false"
         android:icon="@drawable/kspol_logo"
-        android:label="+K spol. STABLE RESET v8 STEP 11"
+        android:enableOnBackInvokedCallback="true"
+        android:label="+K spol. STABLE RESET v8 STEP 12"
         android:roundIcon="@drawable/kspol_logo"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">

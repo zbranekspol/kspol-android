@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.os.Build;
 import android.os.Bundle;
 import android.net.Uri;
 import android.text.Editable;
@@ -52,7 +53,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 11.
+ * STABLE RESET v8 / krok 12.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -92,6 +93,7 @@ public final class MainActivity extends Activity {
     private LinearLayout searchResults;
     private boolean catalogSearchLoading;
     private Runnable backAction;
+    private Object systemBackCallback;
     private float gestureStartX;
     private float gestureStartY;
     private long gestureStartTime;
@@ -118,23 +120,38 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (Build.VERSION.SDK_INT >= 33) {
+            systemBackCallback = BackGestureApi33.register(this);
+        }
         showHomeScreen();
     }
 
     @SuppressWarnings("deprecation")
     @Override
     public void onBackPressed() {
-        if (backAction != null) {
-            Runnable action = backAction;
-            backAction = null;
-            action.run();
-            return;
+        if (!runBackAction()) {
+            super.onBackPressed();
         }
-        super.onBackPressed();
     }
 
     private void goBack() {
-        onBackPressed();
+        runBackAction();
+    }
+
+    private boolean runBackAction() {
+        if (backAction == null) {
+            return false;
+        }
+        Runnable action = backAction;
+        backAction = null;
+        action.run();
+        return true;
+    }
+
+    private void handleSystemBackGesture() {
+        if (!runBackAction()) {
+            moveTaskToBack(true);
+        }
     }
 
     @Override
@@ -162,7 +179,7 @@ public final class MainActivity extends Activity {
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 11", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 12", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -1435,8 +1452,27 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && systemBackCallback != null) {
+            BackGestureApi33.unregister(this, systemBackCallback);
+            systemBackCallback = null;
+        }
         imageExecutor.shutdownNow();
         super.onDestroy();
+    }
+
+    @android.annotation.TargetApi(33)
+    private static final class BackGestureApi33 {
+        private static Object register(MainActivity activity) {
+            android.window.OnBackInvokedCallback callback = activity::handleSystemBackGesture;
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, callback);
+            return callback;
+        }
+
+        private static void unregister(MainActivity activity, Object callback) {
+            activity.getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(
+                    (android.window.OnBackInvokedCallback) callback);
+        }
     }
 
     private static final class Product {
