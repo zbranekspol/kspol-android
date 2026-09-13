@@ -59,7 +59,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 14.
+ * STABLE RESET v8 / krok 15.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -72,6 +72,13 @@ public final class MainActivity extends Activity {
     private static final int RED = Color.rgb(155, 45, 45);
     private static final String PREFS = "kspol_step3_local_inquiries";
     private static final String INQUIRY_COUNT = "inquiry_count";
+    private static final String INQUIRY_STATUS_SENT = "sent";
+    private static final String INQUIRY_STATUS_IN_STOCK = "in_stock";
+    private static final String INQUIRY_STATUS_UNAVAILABLE = "unavailable";
+    private static final String INQUIRY_STATUS_RESERVATION_REQUESTED = "reservation_requested";
+    private static final String INQUIRY_STATUS_NO_RESERVATION = "no_reservation";
+    private static final String INQUIRY_STATUS_RESERVED = "reserved";
+    private static final String INQUIRY_STATUS_RESERVATION_REJECTED = "reservation_rejected";
     private static final String CATALOG_CACHE_FILE = "shop5_catalog.xml";
     private static final int CATALOG_BATCH_SIZE = 20;
     private static final String EMPLOYEE_EMAIL = "zbrane.kspol@gmail.com";
@@ -186,7 +193,7 @@ public final class MainActivity extends Activity {
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 14", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 15", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -199,11 +206,13 @@ public final class MainActivity extends Activity {
         searchInput.setBackground(rounded(Color.WHITE, BORDER, 14));
         addTopMargin(content, searchInput, 12);
 
-        content.addView(createSortControl(() -> {
+        View searchSortControl = createSortControl(() -> {
             if (searchInput != null) {
                 renderSearchResults(searchInput.getText().toString());
             }
-        }));
+        });
+        searchSortControl.setVisibility(View.GONE);
+        content.addView(searchSortControl);
 
         searchSummary = label("", 14, Color.DKGRAY, true);
         searchSummary.setVisibility(View.GONE);
@@ -223,6 +232,8 @@ public final class MainActivity extends Activity {
 
             @Override
             public void afterTextChanged(Editable value) {
+                searchSortControl.setVisibility(value.toString().trim().isEmpty()
+                        ? View.GONE : View.VISIBLE);
                 renderSearchResults(value.toString());
             }
         });
@@ -252,7 +263,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 14 zobrazuje pouze produkty označené e-shopem jako skladem. "
+                "Krok 15 zobrazuje pouze produkty označené e-shopem jako skladem. "
                         + "Drobečková cesta ukazuje aktuální kategorii i podkategorii. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
@@ -984,7 +995,7 @@ public final class MainActivity extends Activity {
                 15, Color.DKGRAY, false));
 
         Button questions = actionButton("DOTAZY ZÁKAZNÍKŮ", GREEN);
-        questions.setOnClickListener(v -> showMyQuestions(this::showAdminScreen));
+        questions.setOnClickListener(v -> showMyQuestions(this::showAdminScreen, true));
         addTopMargin(content, questions, 16);
 
         Button changePassword = secondaryButton("ZMĚNIT HESLO");
@@ -1150,12 +1161,16 @@ public final class MainActivity extends Activity {
     }
 
     private void showMyQuestions(Runnable parentAction) {
+        showMyQuestions(parentAction, false);
+    }
+
+    private void showMyQuestions(Runnable parentAction, boolean adminMode) {
         backAction = parentAction;
         LinearLayout root = createRoot();
-        root.addView(createHeader("MOJE DOTAZY"));
+        root.addView(createHeader(adminMode ? "DOTAZY ZÁKAZNÍKŮ" : "MOJE DOTAZY"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        Button back = secondaryButton("← ZPĚT NA KATALOG");
+        Button back = secondaryButton(adminMode ? "← ZPĚT DO ADMINISTRACE" : "← ZPĚT NA KATALOG");
         back.setOnClickListener(v -> goBack());
         content.addView(back);
         List<Inquiry> inquiries = loadLocalInquiries();
@@ -1165,7 +1180,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, empty, 16);
         } else {
             for (int i = inquiries.size() - 1; i >= 0; i--) {
-                content.addView(inquiryHistoryCard(inquiries.get(i)));
+                content.addView(inquiryHistoryCard(inquiries.get(i), adminMode, parentAction));
             }
         }
         scroll.addView(content);
@@ -1196,6 +1211,7 @@ public final class MainActivity extends Activity {
                 .putString("inquiry_" + index + "_number", questionNumber)
                 .putString("inquiry_" + index + "_created", createdAt)
                 .putString("inquiry_" + index + "_products", productNames.toString())
+                .putString("inquiry_" + index + "_status", INQUIRY_STATUS_SENT)
                 .putInt(INQUIRY_COUNT, index + 1)
                 .commit();
         return questionNumber;
@@ -1209,14 +1225,16 @@ public final class MainActivity extends Activity {
             String number = preferences.getString("inquiry_" + i + "_number", "");
             String created = preferences.getString("inquiry_" + i + "_created", "");
             String productNames = preferences.getString("inquiry_" + i + "_products", "");
+            String status = preferences.getString("inquiry_" + i + "_status", INQUIRY_STATUS_SENT);
             if (!number.isEmpty()) {
-                inquiries.add(new Inquiry(number, created, productNames));
+                inquiries.add(new Inquiry(i, number, created, productNames, status));
             }
         }
         return inquiries;
     }
 
-    private LinearLayout inquiryHistoryCard(Inquiry inquiry) {
+    private LinearLayout inquiryHistoryCard(Inquiry inquiry, boolean adminMode,
+                                            Runnable parentAction) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -1224,12 +1242,93 @@ public final class MainActivity extends Activity {
         card.addView(label("Číslo dotazu " + inquiry.number, 18, GREEN, true));
         card.addView(label(inquiry.createdAt, 13, Color.DKGRAY, false));
         card.addView(label(inquiry.productNames, 15, BLACK, false));
-        card.addView(label("ČEKÁ NA VYŘÍZENÍ", 12, GREEN, true));
+        card.addView(label(inquiryStatusText(inquiry.status), 13,
+                inquiryStatusColor(inquiry.status), true));
+
+        if (adminMode && INQUIRY_STATUS_SENT.equals(inquiry.status)) {
+            Button available = actionButton("ZBOŽÍ JE NA PRODEJNĚ SKLADEM", GREEN);
+            available.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_IN_STOCK);
+                showMyQuestions(parentAction, true);
+            });
+            addTopMargin(card, available, 10);
+            Button unavailable = secondaryButton("ZBOŽÍ NENÍ NA PRODEJNĚ SKLADEM");
+            unavailable.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_UNAVAILABLE);
+                showMyQuestions(parentAction, true);
+            });
+            addTopMargin(card, unavailable, 8);
+        } else if (!adminMode && INQUIRY_STATUS_IN_STOCK.equals(inquiry.status)) {
+            Button reserve = actionButton("REZERVOVAT", GREEN);
+            reserve.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_RESERVATION_REQUESTED);
+                showMyQuestions(parentAction, false);
+            });
+            addTopMargin(card, reserve, 10);
+            Button withoutReservation = secondaryButton("BEZ REZERVACE");
+            withoutReservation.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_NO_RESERVATION);
+                showMyQuestions(parentAction, false);
+            });
+            addTopMargin(card, withoutReservation, 8);
+        } else if (adminMode && INQUIRY_STATUS_RESERVATION_REQUESTED.equals(inquiry.status)) {
+            Button confirm = actionButton("POTVRDIT REZERVACI", GREEN);
+            confirm.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_RESERVED);
+                showMyQuestions(parentAction, true);
+            });
+            addTopMargin(card, confirm, 10);
+            Button reject = secondaryButton("REZERVACI NELZE POTVRDIT");
+            reject.setOnClickListener(v -> {
+                updateInquiryStatus(inquiry.index, INQUIRY_STATUS_RESERVATION_REJECTED);
+                showMyQuestions(parentAction, true);
+            });
+            addTopMargin(card, reject, 8);
+        }
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, dp(8), 0, dp(8));
         card.setLayoutParams(params);
         return card;
+    }
+
+    private void updateInquiryStatus(int index, String status) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString("inquiry_" + index + "_status", status)
+                .putString("inquiry_" + index + "_status_updated",
+                        new SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                                .format(new Date()))
+                .apply();
+    }
+
+    private String inquiryStatusText(String status) {
+        if (INQUIRY_STATUS_IN_STOCK.equals(status)) {
+            return "ZBOŽÍ JE NA PRODEJNĚ SKLADEM – přejete si jej rezervovat?";
+        }
+        if (INQUIRY_STATUS_UNAVAILABLE.equals(status)) {
+            return "ZBOŽÍ NENÍ NA PRODEJNĚ SKLADEM";
+        }
+        if (INQUIRY_STATUS_RESERVATION_REQUESTED.equals(status)) {
+            return "POŽADAVEK NA REZERVACI ODESLÁN – čeká na potvrzení zaměstnancem";
+        }
+        if (INQUIRY_STATUS_NO_RESERVATION.equals(status)) {
+            return "ZBOŽÍ JE SKLADEM – bez rezervace";
+        }
+        if (INQUIRY_STATUS_RESERVED.equals(status)) {
+            return "ZAREZERVOVÁNO DO KONCE PRACOVNÍ DOBY";
+        }
+        if (INQUIRY_STATUS_RESERVATION_REJECTED.equals(status)) {
+            return "REZERVACI NELZE POTVRDIT";
+        }
+        return "DOTAZ ODESLÁN – čeká na ověření dostupnosti";
+    }
+
+    private int inquiryStatusColor(String status) {
+        if (INQUIRY_STATUS_UNAVAILABLE.equals(status)
+                || INQUIRY_STATUS_RESERVATION_REJECTED.equals(status)) {
+            return RED;
+        }
+        return GREEN;
     }
 
     private LinearLayout productCard(Product product, boolean searchMode) {
@@ -1637,14 +1736,18 @@ public final class MainActivity extends Activity {
     }
 
     private static final class Inquiry {
+        final int index;
         final String number;
         final String createdAt;
         final String productNames;
+        final String status;
 
-        Inquiry(String number, String createdAt, String productNames) {
+        Inquiry(int index, String number, String createdAt, String productNames, String status) {
+            this.index = index;
             this.number = number;
             this.createdAt = createdAt;
             this.productNames = productNames;
+            this.status = status;
         }
     }
 }

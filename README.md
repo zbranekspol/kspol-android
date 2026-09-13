@@ -1,8 +1,8 @@
-# +K spol. — STABLE RESET v8 / krok 14
+# +K spol. — STABLE RESET v8 / krok 15
 
 Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 14
+## Rozsah kroku 15
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
@@ -16,6 +16,7 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabiln
 - produkty lze řadit podle ceny vzestupně i sestupně a podle názvu A–Z i Z–A
 - zvolené řazení platí v kategoriích, podkategoriích i výsledcích hledání
 - popisek řazení a rozbalovací nabídka jsou v jednom kompaktním řádku
+- na titulní stránce se samotnými kategoriemi se řazení nezobrazuje
 - každá kategorie a podkategorie má vlastní pole hledání hned pod záhlavím
 - hledání filtruje pouze názvy a popisy produktů v právě otevřené části katalogu
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace
@@ -37,7 +38,10 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabiln
 - lokální cache má denní cyklus od 6:00 českého času
 - při chybě aktualizace se použije poslední funkční kopie
 - produkty se zobrazují po 20 položkách, další se načtou tlačítkem
-- zákaznický záznam je vždy dotaz; rezervace vznikne až po pozdějším potvrzení zaměstnancem
+- zákaznický záznam je vždy nejprve dotaz; zaměstnanec potvrzuje pouze dostupnost na prodejně
+- po potvrzení dostupnosti zákazník zvolí REZERVOVAT nebo BEZ REZERVACE
+- požadavek na rezervaci ještě jednou potvrzuje zaměstnanec
+- až po druhém potvrzení zákazník vidí „ZAREZERVOVÁNO DO KONCE PRACOVNÍ DOBY“
 - potvrzení po vytvoření používá text „Dotaz odeslán“
 - každá položka z XML má malý odkaz ZOBRAZIT V E-SHOPU na přesnou produktovou stránku
 - odkazy se otevírají v systémovém prohlížeči a jsou omezené na doménu zbrane-kspol.cz
