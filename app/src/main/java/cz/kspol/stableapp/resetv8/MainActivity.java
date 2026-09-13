@@ -59,7 +59,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 13.
+ * STABLE RESET v8 / krok 14.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -186,7 +186,7 @@ public final class MainActivity extends Activity {
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 13", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 14", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -252,7 +252,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 13 zobrazuje pouze produkty označené e-shopem jako skladem. "
+                "Krok 14 zobrazuje pouze produkty označené e-shopem jako skladem. "
                         + "Drobečková cesta ukazuje aktuální kategorii i podkategorii. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
@@ -571,15 +571,21 @@ public final class MainActivity extends Activity {
 
     private View createSortControl(Runnable onChanged) {
         LinearLayout control = new LinearLayout(this);
-        control.setOrientation(LinearLayout.VERTICAL);
-        control.setPadding(0, dp(8), 0, dp(6));
-        control.addView(label("Seřadit produkty", 13, Color.DKGRAY, true));
+        control.setOrientation(LinearLayout.HORIZONTAL);
+        control.setGravity(Gravity.CENTER_VERTICAL);
+        control.setPadding(dp(10), dp(5), dp(6), dp(5));
+        control.setBackground(rounded(Color.WHITE, BORDER, 12));
+
+        TextView sortLabel = label("Seřadit produkty", 13, Color.DKGRAY, true);
+        sortLabel.setSingleLine(true);
+        control.addView(sortLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         Spinner spinner = new Spinner(this);
         spinner.setContentDescription("Seřadit produkty");
         String[] choices = new String[]{
-                "Cena: od nejnižší",
-                "Cena: od nejvyšší",
+                "Cena ↑",
+                "Cena ↓",
                 "Název: A–Z",
                 "Název: Z–A"
         };
@@ -602,8 +608,10 @@ public final class MainActivity extends Activity {
             public void onNothingSelected(AdapterView<?> parent) {
             }
         });
-        control.addView(spinner, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        spinnerParams.setMargins(dp(8), 0, 0, 0);
+        control.addView(spinner, spinnerParams);
         return control;
     }
 
