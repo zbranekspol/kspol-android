@@ -1,8 +1,8 @@
-# +K spol. — STABLE RESET v8 / krok 12
+# +K spol. — STABLE RESET v8 / krok 13
 
 Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabilní v7 nebyl použit.
 
-## Rozsah kroku 12
+## Rozsah kroku 13
 
 - černobílé logo +K spol. převzaté ze záhlaví oficiálního e-shopu
 - pozadí záhlaví z oficiální facebookové prezentace +K spol.
@@ -13,6 +13,8 @@ Navazuje výhradně na uživatelem potvrzený stabilní krok 9. Kód z nestabiln
 - klepnutí na drobečkovou cestu vrací o jednu úroveň výš
 - systémové gesto Zpět z levého i pravého okraje provede stejný krok zpět jako drobečková cesta
 - vlastní gesto zprava doleva uvnitř obsahu zůstává podporované
+- produkty lze řadit podle ceny vzestupně i sestupně a podle názvu A–Z i Z–A
+- zvolené řazení platí v kategoriích, podkategoriích i výsledcích hledání
 - každá kategorie a podkategorie má vlastní pole hledání hned pod záhlavím
 - hledání filtruje pouze názvy a popisy produktů v právě otevřené části katalogu
 - systémové tlačítko Zpět vrací o jednu obrazovku včetně podkategorií a administrace

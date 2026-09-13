@@ -21,12 +21,15 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -40,9 +43,12 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.Collator;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -53,7 +59,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * STABLE RESET v8 / krok 12.
+ * STABLE RESET v8 / krok 13.
  * Start je stále bez sítě, WebView a čtení lokálních dat. Uložené dotazy se
  * načtou až po otevření obrazovky MOJE DOTAZY. Kategorie Shop5 jsou na titulní
  * stránce a katalog se načítá až po výběru kategorie nebo zahájení hledání.
@@ -97,6 +103,7 @@ public final class MainActivity extends Activity {
     private float gestureStartX;
     private float gestureStartY;
     private long gestureStartTime;
+    private SortMode selectedSortMode = SortMode.NAME_ASC;
 
     private final String[] shopCategories = new String[]{
             "AKCE", "Bazar, komisní prodej", "Zbraně na ZO", "Zbraně bez ZO",
@@ -179,7 +186,7 @@ public final class MainActivity extends Activity {
         root.addView(createHeader("Ověření dostupnosti produktů na prodejně"));
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = verticalContainer();
-        content.addView(label("STABLE RESET v8 • TEST KROK 12", 14, Color.DKGRAY, false));
+        content.addView(label("STABLE RESET v8 • TEST KROK 13", 14, Color.DKGRAY, false));
 
         searchInput = new EditText(this);
         searchInput.setHint("Hledat podle názvu nebo popisu…");
@@ -191,6 +198,12 @@ public final class MainActivity extends Activity {
         searchInput.setPadding(dp(16), dp(12), dp(16), dp(12));
         searchInput.setBackground(rounded(Color.WHITE, BORDER, 14));
         addTopMargin(content, searchInput, 12);
+
+        content.addView(createSortControl(() -> {
+            if (searchInput != null) {
+                renderSearchResults(searchInput.getText().toString());
+            }
+        }));
 
         searchSummary = label("", 14, Color.DKGRAY, true);
         searchSummary.setVisibility(View.GONE);
@@ -239,7 +252,7 @@ public final class MainActivity extends Activity {
             addTopMargin(content, inquiry, 16);
         }
         TextView note = label(
-                "Krok 11 zobrazuje pouze produkty označené e-shopem jako skladem. "
+                "Krok 13 zobrazuje pouze produkty označené e-shopem jako skladem. "
                         + "Drobečková cesta ukazuje aktuální kategorii i podkategorii. "
                         + "Číslo označuje dotaz; rezervace vznikne až po potvrzení zaměstnancem, "
                         + "že je zboží skladem na prodejně. Aplikace při startu nepoužívá internet.",
@@ -287,23 +300,23 @@ public final class MainActivity extends Activity {
             }
             return;
         }
-        int matchCount = 0;
-        int displayed = 0;
+        List<Product> matches = new ArrayList<>();
         for (Product product : catalogProducts) {
             String searchable = (product.name + " " + product.description)
                     .toLowerCase(Locale.getDefault());
             if (searchable.contains(query)) {
-                matchCount++;
-                if (displayed < 30) {
-                    searchResults.addView(productCard(product, true));
-                    displayed++;
-                }
+                matches.add(product);
             }
         }
-        searchSummary.setText(matchCount == 0
+        matches = sortedProducts(matches);
+        int displayed = Math.min(30, matches.size());
+        for (int i = 0; i < displayed; i++) {
+            searchResults.addView(productCard(matches.get(i), true));
+        }
+        searchSummary.setText(matches.isEmpty()
                 ? "Žádný produkt nenalezen"
-                : "Nalezené produkty: " + matchCount
-                        + (matchCount > displayed ? " • zobrazeno prvních " + displayed : ""));
+                : "Nalezené produkty: " + matches.size()
+                        + (matches.size() > displayed ? " • zobrazeno prvních " + displayed : ""));
         searchSummary.setVisibility(View.VISIBLE);
     }
 
@@ -321,10 +334,15 @@ public final class MainActivity extends Activity {
             inquiry.setOnClickListener(v -> showInquiry());
             addTopMargin(content, inquiry, 10);
         }
+        List<Product> visibleProducts = new ArrayList<>();
         for (Product product : products) {
             if (category == null || category.equals(product.category)) {
-                content.addView(productCard(product, false));
+                visibleProducts.add(product);
             }
+        }
+        content.addView(createSortControl(() -> showProducts(category)));
+        for (Product product : sortedProducts(visibleProducts)) {
+            content.addView(productCard(product, false));
         }
         scroll.addView(content);
         root.addView(scroll, matchRemaining());
@@ -443,6 +461,9 @@ public final class MainActivity extends Activity {
         categorySearch.setBackground(rounded(Color.WHITE, BORDER, 14));
         content.addView(categorySearch);
 
+        content.addView(createSortControl(() -> showShopCategory(title, categoryProducts, depth,
+                parentAction, breadcrumbPath)));
+
         Button back = secondaryButton("← O ÚROVEŇ VÝŠ");
         back.setOnClickListener(v -> goBack());
         addTopMargin(content, back, 8);
@@ -488,7 +509,7 @@ public final class MainActivity extends Activity {
             defaultSection.addView(label("V této kategorii nyní není aktivní zboží.",
                     15, Color.DKGRAY, false));
         } else {
-            appendProductBatch(defaultSection, categoryProducts, 0);
+            appendProductBatch(defaultSection, sortedProducts(categoryProducts), 0);
         }
 
         categorySearch.addTextChangedListener(new TextWatcher() {
@@ -523,7 +544,7 @@ public final class MainActivity extends Activity {
                         ? "Žádný produkt v této kategorii nenalezen"
                         : "Nalezené produkty: " + matches.size(), 15, Color.DKGRAY, true));
                 if (!matches.isEmpty()) {
-                    appendProductBatch(filteredSection, matches, 0);
+                    appendProductBatch(filteredSection, sortedProducts(matches), 0);
                 }
             }
         });
@@ -546,6 +567,79 @@ public final class MainActivity extends Activity {
             });
             addTopMargin(target, more, 12);
         }
+    }
+
+    private View createSortControl(Runnable onChanged) {
+        LinearLayout control = new LinearLayout(this);
+        control.setOrientation(LinearLayout.VERTICAL);
+        control.setPadding(0, dp(8), 0, dp(6));
+        control.addView(label("Seřadit produkty", 13, Color.DKGRAY, true));
+
+        Spinner spinner = new Spinner(this);
+        spinner.setContentDescription("Seřadit produkty");
+        String[] choices = new String[]{
+                "Cena: od nejnižší",
+                "Cena: od nejvyšší",
+                "Název: A–Z",
+                "Název: Z–A"
+        };
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, choices);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(selectedSortMode.ordinal(), false);
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                SortMode next = SortMode.values()[position];
+                if (next != selectedSortMode) {
+                    selectedSortMode = next;
+                    onChanged.run();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        control.addView(spinner, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        return control;
+    }
+
+    private List<Product> sortedProducts(List<Product> source) {
+        List<Product> sorted = new ArrayList<>(source);
+        Collator collator = Collator.getInstance(new Locale("cs", "CZ"));
+        collator.setStrength(Collator.PRIMARY);
+        Comparator<Product> byName = (left, right) -> collator.compare(left.name, right.name);
+        Comparator<Product> comparator;
+        if (selectedSortMode == SortMode.PRICE_ASC) {
+            comparator = (left, right) -> compareProductPrices(left, right, true, byName);
+        } else if (selectedSortMode == SortMode.PRICE_DESC) {
+            comparator = (left, right) -> compareProductPrices(left, right, false, byName);
+        } else if (selectedSortMode == SortMode.NAME_DESC) {
+            comparator = byName.reversed();
+        } else {
+            comparator = byName;
+        }
+        Collections.sort(sorted, comparator);
+        return sorted;
+    }
+
+    private int compareProductPrices(Product left, Product right, boolean ascending,
+            Comparator<Product> byName) {
+        boolean leftUnknown = Double.isNaN(left.numericPrice);
+        boolean rightUnknown = Double.isNaN(right.numericPrice);
+        if (leftUnknown != rightUnknown) {
+            return leftUnknown ? 1 : -1;
+        }
+        if (leftUnknown) {
+            return byName.compare(left, right);
+        }
+        int priceResult = ascending
+                ? Double.compare(left.numericPrice, right.numericPrice)
+                : Double.compare(right.numericPrice, left.numericPrice);
+        return priceResult != 0 ? priceResult : byName.compare(left, right);
     }
 
     private List<Product> productsForTopCategory(String category) {
@@ -705,7 +799,8 @@ public final class MainActivity extends Activity {
                         if (cleanCategory.isEmpty()) cleanCategory = "Ostatní";
                         String subtitle = formatOffer(price, "in stock");
                         parsed.add(new Product(cleanName, subtitle, cleanCategory,
-                                R.drawable.product_accessory, cleanDescription, imageUrl, productUrl));
+                                R.drawable.product_accessory, cleanDescription, imageUrl, productUrl,
+                                parsePriceValue(price)));
                     }
                 }
                 event = parser.next();
@@ -775,6 +870,20 @@ public final class MainActivity extends Activity {
         if (cleanPrice.isEmpty()) return stock;
         if (stock.isEmpty()) return cleanPrice;
         return cleanPrice + " • " + stock;
+    }
+
+    private double parsePriceValue(String rawPrice) {
+        String normalized = cleanHtml(rawPrice).replace('\u00a0', ' ').trim();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("[-+]?\\d[\\d\\s]*(?:[.,]\\d+)?")
+                .matcher(normalized);
+        if (!matcher.find()) return Double.NaN;
+        String number = matcher.group().replace(" ", "").replace(',', '.');
+        try {
+            return Double.parseDouble(number);
+        } catch (NumberFormatException ignored) {
+            return Double.NaN;
+        }
     }
 
     private File catalogCacheFile() {
@@ -1475,6 +1584,13 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private enum SortMode {
+        PRICE_ASC,
+        PRICE_DESC,
+        NAME_ASC,
+        NAME_DESC
+    }
+
     private static final class Product {
         final String name;
         final String subtitle;
@@ -1483,13 +1599,14 @@ public final class MainActivity extends Activity {
         final String description;
         final String imageUrl;
         final String productUrl;
+        final double numericPrice;
 
         Product(String name, String subtitle, String category, int imageRes) {
-            this(name, subtitle, category, imageRes, subtitle, "", "");
+            this(name, subtitle, category, imageRes, subtitle, "", "", Double.NaN);
         }
 
         Product(String name, String subtitle, String category, int imageRes,
-                String description, String imageUrl, String productUrl) {
+                String description, String imageUrl, String productUrl, double numericPrice) {
             this.name = name;
             this.subtitle = subtitle;
             this.category = category;
@@ -1497,6 +1614,7 @@ public final class MainActivity extends Activity {
             this.description = description == null ? "" : description;
             this.imageUrl = imageUrl == null ? "" : imageUrl.trim();
             this.productUrl = productUrl == null ? "" : productUrl.trim();
+            this.numericPrice = numericPrice;
         }
     }
 
